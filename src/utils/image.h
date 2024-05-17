@@ -50,7 +50,7 @@ class Image {
   private:
     std::vector<Vec> data;
 
-    uint8_t convert(double value) {
+    uint8_t convert(Float value) {
         return int(pow(clamp(value), 1 / 2.2) * 255 + .5);
     }
 
