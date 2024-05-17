@@ -3,7 +3,7 @@
 #include "camera.h"
 #include "scene.h"
 
-const int MaxDepth = 5;
+const int MaxDepth = 50;
 
 class RayTracer {
     public:

@@ -69,18 +69,22 @@ class RtCpu : public RayTracer {
         const Sphere &object = scene[hit_object];
         Vec x = r.origin + r.dir * min_dis;
         Vec n = (x - object.position).norm();
-        Vec nl = n.dot(r.dir) < 0 ? n : n * -1;
+        Vec nl = n.dot(r.dir) < 0 ? n : n * -1; // 交点的法线方向，如果是从内部射入物体，则取反
         Vec f = object.color;
         double p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
                                                             : f.z;
 
         // printf("x: (%lf,%lf,%lf), p: %lf t: %d id: %d\n", x.x, x.y, x.z, p,min_dis,hit_object);
-        if (++depth > MaxDepth) {
+        if (++depth > 5) {
             if (random() < p)
                 f = f * (1 / p);
             else
                 return object.emission;
         }
+
+        // limit the depth of the recursion
+        if (depth > MaxDepth)
+            return object.emission;
 
         //  Diffuse
         if (object.material == MaterialType::DIFFUSE) {
