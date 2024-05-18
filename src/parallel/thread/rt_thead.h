@@ -2,7 +2,8 @@
 #include "raytracer.h"
 #include "task_queue.h"
 #include "viz_helper.h"
-#include <array>
+#include <stack>
+#include <tuple>
 
 class RtThread : public RayTracer {
   private:
@@ -13,7 +14,7 @@ class RtThread : public RayTracer {
     TaskQueue taskQueue;
 
   public:
-    RtThread(Image &image, Camera camera, Scene &scene, int samples, int numThreads = 12)
+    RtThread(Image &image, Camera camera, Scene &scene, int samples, int numThreads = 1)
         : image(image), camera(camera), scene(scene), samples(samples), taskQueue(numThreads) {}
 
     void render() override {
@@ -24,8 +25,9 @@ class RtThread : public RayTracer {
 
             for (int x = 0; x < image.width; x++) // Loop cols
             {
-                for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
-                    auto f = [&, x = x, y = y, suby = suby]() {
+                auto func = [&, y = y, x = x]() {
+                    // printf("%d %d\n",x,y);
+                    for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
                         Vec ret = Vec();
                         for (int subx = 0; subx < 2; subx++) {
                             for (int s = 0; s < samples; s++) {
@@ -39,12 +41,13 @@ class RtThread : public RayTracer {
                                         camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
                                 ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene);
+                                // printf("1");
                             }
                         }
-                        image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
-                    };
-                    taskQueue.add(f);
-                }
+                        // image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
+                    }
+                };
+                taskQueue.add(func);
             }
         }
         taskQueue.joinAll();
@@ -58,46 +61,43 @@ class RtThread : public RayTracer {
 
     Vec tracing(const Ray &ray, int depth, Scene &scene) {
 
-        bool hit_flag = true;
-        std::array<HitRecord, MaxDepth> HitInfo{};
+        std::stack<std::tuple<Ray, int>> traceStack;
+        traceStack.push(std::make_tuple(ray, depth));
 
-        Ray cur_r = ray;
+        Vec result = Vec();
 
-        for (int i = 0; i < MaxDepth; i++) {
+        while (!traceStack.empty()) {
+            Ray currentRay = std::get<0>(traceStack.top());
+            int currentDepth = std::get<1>(traceStack.top());
+            traceStack.pop();
+
             Float min_dis;
             int hit_object = 0;
-            // std::array<HitRecord,MaxDepth>
-            if (!intersect(cur_r, min_dis, hit_object, scene)) {
-                hit_flag = false;
-                break;
-            }
 
-            // hit object
+            if (!intersect(currentRay, min_dis, hit_object, scene))
+                continue;
+
             const Sphere &object = scene[hit_object];
-            Vec x = cur_r.origin + cur_r.dir * min_dis;
+            Vec x = currentRay.origin + currentRay.dir * min_dis;
             Vec n = (x - object.position).norm();
-            Vec nl = n.dot(cur_r.dir) < 0 ? n : n * -1; // 交点的法线方向，如果是从内部射入物体，则取反
+            Vec nl = n.dot(currentRay.dir) < 0 ? n : n * -1;
             Vec f = object.color;
             Float p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
                                                                : f.z;
 
-            // printf("x: (%lf,%lf,%lf), p: %lf t: %d id: %d\n", x.x, x.y, x.z, p,min_dis,hit_object);
-            if (++depth > 5) {
+            if (++currentDepth > 5) {
                 if (random() < p)
                     f = f * (1 / p);
-                else {
-                    HitInfo[depth - 1] = HitRecord(object.emission);
-                    break;
-                }
+                else
+                    result = object.emission;
+                continue;
             }
 
-            // limit the depth of the recursion
-            if (depth > MaxDepth) {
-                HitInfo[depth - 1] = HitRecord(object.emission);
-                break;
+            if (currentDepth > MaxDepth) {
+                result = object.emission;
+                continue;
             }
 
-            //  Diffuse
             if (object.material == MaterialType::DIFFUSE) {
                 Float r1 = 2 * PI * random();
                 Float r2 = random();
@@ -106,48 +106,31 @@ class RtThread : public RayTracer {
                 Vec u = ((fabs(w.x) > .1 ? Vec(0, 1) : Vec(1)) % w).norm();
                 Vec v = w % u;
                 Vec d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).norm();
-                // printf("d: (%lf,%lf,%lf)\n", d.x, d.y, d.z);
-                HitInfo[depth - 1] = HitRecord(object.emission, object.color);
-                cur_r = Ray(x, d);
+                traceStack.push(std::make_tuple(Ray(x, d), currentDepth));
                 continue;
             }
 
-            // Specular
             if (object.material == MaterialType::SPECULAR) {
-                HitInfo[depth - 1] = HitRecord(object.emission, object.color);
-                cur_r = Ray(x, cur_r.dir - n * 2 * n.dot(cur_r.dir));
+                traceStack.push(std::make_tuple(Ray(x, currentRay.dir - n * 2 * n.dot(currentRay.dir)), currentDepth));
                 continue;
             }
 
-            // Refractive
-            Ray reflRay(x, cur_r.dir - n * 2 * n.dot(cur_r.dir));
+            Ray reflRay(x, currentRay.dir - n * 2 * n.dot(currentRay.dir));
             bool into = n.dot(nl) > 0;
-            Float nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = cur_r.dir.dot(nl), cos2t;
-            // printf("ddn: %lf\n", ddn);
+            Float nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = currentRay.dir.dot(nl), cos2t;
+
             if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) < 0) {
-                HitInfo[depth - 1] = HitRecord(object.emission, object.color);
-                cur_r = reflRay;
+                traceStack.push(std::make_tuple(reflRay, currentDepth));
                 continue;
             }
-            Vec tdir = (cur_r.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).norm();
+
+            Vec tdir = (currentRay.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).norm();
             Float a = nt - nc, b = nt + nc, R0 = a * a / (b * b), c = 1 - (into ? -ddn : tdir.dot(n));
             Float Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re, P = .25 + .5 * Re, RP = Re / P, TP = Tr / (1 - P);
 
-            // printf("Re: %lf, Tr: %lf, P: %lf, RP: %lf, TP: %lf\n", Re, Tr, P, RP, TP);
-
-            
-
-            return object.emission + object.color.mult(depth > 2 ? (random() < P ? tracing(reflRay, depth, scene) * RP : tracing(Ray(x, tdir), depth, scene) * TP) : tracing(reflRay, depth, scene) * Re + tracing(Ray(x, tdir), depth, scene) * Tr);
+            result = object.emission + object.color.mult(depth > 2 ? (random() < P ? tracing(reflRay, currentDepth, scene) * RP : tracing(Ray(x, tdir), currentDepth, scene) * TP) : tracing(reflRay, currentDepth, scene) * Re + tracing(Ray(x, tdir), currentDepth, scene) * Tr);
         }
 
-        if (!hit_flag)
-            return Vec();
-
-        Vec ret{};
-        for (int d = depth - 1; d >= 0; d--) {
-            ret = ret.mult(HitInfo[d].diffuse);
-            ret = ret + HitInfo[d].emission;
-        }
-        return ret;
+        return result;
     }
 };

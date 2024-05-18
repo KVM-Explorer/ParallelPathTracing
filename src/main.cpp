@@ -1,14 +1,13 @@
 #include "camera.h"
 #include "image.h"
 #include "parallel/simd/rt_sse.h"
+#include "parallel/thread/rt_openmp.h"
+#include "parallel/thread/rt_thead.h"
 #include "profile.h"
 #include "raytracer.h"
 #include "rt_cpu.h"
 #include "scene.h"
 #include <iostream>
-#include "parallel/thread/rt_thead.h"
-#include "parallel/thread/rt_openmp.h"
-
 
 enum class Mode {
     CPU,
@@ -26,10 +25,10 @@ int main(int argc, char *argv[]) {
     // configuration
 
     Image image("image.ppm", 1024, 768);
-    Mode mode = Mode::CPU;
+    Mode mode = Mode::RawThread;
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
     Scene scene = CornellBox();
-    int samples = 2;
+    int samples = 1;
     bool profile = true;
 
     // render

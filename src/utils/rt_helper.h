@@ -1,12 +1,14 @@
 
 #pragma once
-#include <cmath>
 #include "types.h"
+#include <cmath>
+
 struct Ray {
     Vec origin;
     Vec dir;
 
     Ray(Vec origin, Vec direction) : origin(origin), dir(direction) {}
+    Ray() {}
 };
 
 struct Sphere {
@@ -28,4 +30,12 @@ struct Sphere {
             det = sqrt(det);
         return (t = b - det) > eps ? t : ((t = b + det) > eps ? t : 0);
     }
+};
+
+struct HitRecord {
+    Vec emission;
+    Vec diffuse;
+
+    HitRecord(Vec emission = Vec(), Vec color = Vec())
+        : emission(emission), diffuse(color) {}
 };

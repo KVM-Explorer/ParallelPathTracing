@@ -118,17 +118,21 @@ Vec radiance(const Ray &r, int depth, unsigned short *Xi) {
                                     : radiance(reflRay, depth, Xi) * Re + radiance(Ray(x, tdir), depth, Xi) * Tr);
 }
 int main(int argc, char *argv[]) {
-    int w = 1024, h = 768, samps = argc == 2 ? atoi(argv[1]) / 4 : 1; // # samples
+    int w = 1024/2, h = 768/2, samps = argc == 2 ? atoi(argv[1]) / 4 : 16; // # samples
     Ray cam(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm());        // cam pos, dir
     Vec cx = Vec(w * .5135 / h), cy = (cx % cam.d).norm() * .5135, r, *c = new Vec[w * h];
     #pragma omp parallel for schedule(dynamic, 1) private(r) // OpenMP
         for (int y = 0; y < h; y++) {                        // Loop over image rows
             fprintf(stderr, "\rRendering (%d spp) %5.2f%%", samps * 4, 100. * y / (h - 1));
-            for (unsigned short x = 0, Xi[3] = {0, 0, y * y * y}; x < w; x++) // Loop cols
-                for (int sy = 0, i = (h - y - 1) * w + x; sy < 2; sy++)       // 2x2 subpixel rows
-                    for (int sx = 0; sx < 2; sx++, r = Vec()) {               // 2x2 subpixel cols
+            for (unsigned short x = 0,
+                                Xi[3] = {0, 0, y * y * y}; x < w; x++) // Loop cols
+                for (int sy = 0,
+                         i = (h - y - 1) * w + x; sy < 2; sy++)       // 2x2 subpixel rows
+                    for (int sx = 0; sx < 2; sx++,
+                             r = Vec()) {               // 2x2 subpixel cols
                         for (int s = 0; s < samps; s++) {
-                            double r1 = 2 * random(), dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                            double r1 = 2 * random(),
+                                   dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
                             double r2 = 2 * random(), dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
                             Vec d = cx * (((sx + .5 + dx) / 2 + x) / w - .5) +
                                     cy * (((sy + .5 + dy) / 2 + y) / h - .5) + cam.d;
