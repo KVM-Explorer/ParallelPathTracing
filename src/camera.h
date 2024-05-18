@@ -1,6 +1,6 @@
 #pragma once
 #include "utils/types.h"
-#include "utils/image.h"
+#include "image.h"
 
 struct Camera {
     Vec position;

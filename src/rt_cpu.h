@@ -1,12 +1,21 @@
 #pragma once
 #include "raytracer.h"
-#include "utils/meta.h"
+#include "viz_helper.h"
+#include "utils/rt_helper.h"
+#include "rt_math.h"
 
 class RtCpu : public RayTracer {
+  private:
+    Image &image;
+    Camera camera;
+    Scene &scene;
+    int samples;
+
   public:
-    RtCpu() {
+    RtCpu(Image &image, Camera camera, Scene &scene, int samples)
+        : image(image), camera(camera), scene(scene), samples(samples){
     }
-    void render(Image &image, Camera camera, Scene &scene, int samples) override {
+    void render() override {
 
         for (int y = 0; y < image.height; y++) {                                  // Loop over image rows
             OutputStatus("RayTracer CPU", y, image.height, samples, image.width); // Output status
@@ -18,11 +27,11 @@ class RtCpu : public RayTracer {
 
                     for (int subx = 0; subx < 2; subx++) {
                         for (int s = 0; s < samples; s++) {
-                            double r1 = 2 * random();
-                            double r2 = 2 * random();
+                            Float r1 = 2 * random();
+                            Float r2 = 2 * random();
 
-                            double dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-                            double dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                            Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                            Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
                             Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                                     camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
@@ -34,9 +43,10 @@ class RtCpu : public RayTracer {
                 }
             }
         }
+        std::cout << "\n";
     }
 
-    void testPixel(Scene &Scene) {
+    Vec testPixel(const Ray& r,Scene &Scene) override {
         // x: 809, y: 0, subx: 1, suby: 1, s: 0 d:(0.189355,-0.283993,-0.939943) tracing:(0.000000,0.000000,0.000000)
 
         // int x = 809;
@@ -55,12 +65,12 @@ class RtCpu : public RayTracer {
         int s = 0;
         Vec d = Vec(-0.311788, -0.274857, -0.909529);
 
-        Vec tmp = tracing(Ray(Vec(50, 52, 295.6) + d * 140, d.norm()), 0, Scene);
+        return tracing(Ray(Vec(50, 52, 295.6) + d * 140, d.norm()), 0, Scene);
     }
 
     Vec tracing(const Ray &r, int depth, Scene &scene) {
 
-        double min_dis;
+        Float min_dis;
         int hit_object = 0;
 
         if (!intersect(r, min_dis, hit_object, scene))
@@ -71,7 +81,7 @@ class RtCpu : public RayTracer {
         Vec n = (x - object.position).norm();
         Vec nl = n.dot(r.dir) < 0 ? n : n * -1; // 交点的法线方向，如果是从内部射入物体，则取反
         Vec f = object.color;
-        double p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
+        Float p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
                                                             : f.z;
 
         // printf("x: (%lf,%lf,%lf), p: %lf t: %d id: %d\n", x.x, x.y, x.z, p,min_dis,hit_object);
@@ -88,9 +98,9 @@ class RtCpu : public RayTracer {
 
         //  Diffuse
         if (object.material == MaterialType::DIFFUSE) {
-            double r1 = 2 * PI * random();
-            double r2 = random();
-            double r2s = sqrt(r2);
+            Float r1 = 2 * PI * random();
+            Float r2 = random();
+            Float r2s = sqrt(r2);
             Vec w = nl;
             Vec u = ((fabs(w.x) > .1 ? Vec(0, 1) : Vec(1)) % w).norm();
             Vec v = w % u;
@@ -108,13 +118,13 @@ class RtCpu : public RayTracer {
         // Refractive
         Ray reflRay(x, r.dir - n * 2 * n.dot(r.dir));
         bool into = n.dot(nl) > 0;
-        double nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = r.dir.dot(nl), cos2t;
+        Float nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = r.dir.dot(nl), cos2t;
         // printf("ddn: %lf\n", ddn);
         if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) < 0)
             return object.emission + object.color.mult(tracing(reflRay, depth, scene));
         Vec tdir = (r.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).norm();
-        double a = nt - nc, b = nt + nc, R0 = a * a / (b * b), c = 1 - (into ? -ddn : tdir.dot(n));
-        double Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re, P = .25 + .5 * Re, RP = Re / P, TP = Tr / (1 - P);
+        Float a = nt - nc, b = nt + nc, R0 = a * a / (b * b), c = 1 - (into ? -ddn : tdir.dot(n));
+        Float Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re, P = .25 + .5 * Re, RP = Re / P, TP = Tr / (1 - P);
 
         // printf("Re: %lf, Tr: %lf, P: %lf, RP: %lf, TP: %lf\n", Re, Tr, P, RP, TP);
 

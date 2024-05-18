@@ -1,6 +1,6 @@
 #pragma once
-#include "types.h"
-#include "utils/meta.h"
+#include "utils/types.h"
+#include "rt_math.h"
 #include <format>
 #include <fstream>
 #include <iostream>

@@ -26,7 +26,7 @@ class Profile {
     }
 
     void print() {
-        std::cout << std::format("Profile: {} time: {:.2f}s, single ray {:.2f}ns \n", name, time/1e6, time / counts);
+        std::cout << std::format("Profile: {} time: {:.2f}s, single ray {:.2f}ns \n", name, time/1e9, time / counts);
     }
 
 };
