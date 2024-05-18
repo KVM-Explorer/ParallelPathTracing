@@ -15,14 +15,18 @@ TEST_CASE("sse::type", "[SSE]") {
 
 TEST_CASE("sse::norm", "[SSE]") {
     using namespace SIMD;
-    VecSSE a = VecSSE(1, 2, 3);
-    REQUIRE(a.norm() == Catch::Approx(3.74165738677));
-}
 
-TEST_CASE("sse::normSSE", "[SSE]") {
-    using namespace SIMD;
+    VecSSE c = VecSSE(1, 2, 3);
+    auto d = c.norm().get();
+    REQUIRE(d.x == Catch::Approx(0.26726124).margin(0.0001));
+    REQUIRE(d.y == Catch::Approx(0.53452248).margin(0.0001));
+    REQUIRE(d.z == Catch::Approx(0.80178373).margin(0.0001));
+
     VecSSE a = VecSSE(1, 2, 3);
-    REQUIRE(a.normSSE() == Catch::Approx(3.74165738677));
+    auto b = a.normSSE().get();
+    REQUIRE(b.x == Catch::Approx(0.26726124).margin(0.0001));
+    REQUIRE(b.y == Catch::Approx(0.53452248).margin(0.0001));
+    REQUIRE(b.z == Catch::Approx(0.80178373).margin(0.001));
 }
 
 TEST_CASE("sse::mult", "[SSE]") {

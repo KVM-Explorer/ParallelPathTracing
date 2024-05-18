@@ -35,16 +35,16 @@ TEST_CASE("cpu::basic operation", "[function]") {
     REQUIRE(a.mult(b).y == 10);
     REQUIRE(a.mult(b).z == 18);
 
-    // TODO: Fix the test case
-    // REQUIRE(a.norm().x == Catch::Approx(0.26726124));
-    // REQUIRE(a.norm().y == Catch::Approx(0.53452248));
-    // REQUIRE(a.norm().z == Catch::Approx(0.80178373));
-
     REQUIRE(a.dot(b) == 32);
 
     REQUIRE((a % b).x == -3);
     REQUIRE((a % b).y == 6);
     REQUIRE((a % b).z == -3);
+
+    // norm change a need test finally
+    REQUIRE(a.norm().x == Catch::Approx(0.26726124).margin(0.0001));
+    REQUIRE(a.norm().y == Catch::Approx(0.53452248).margin(0.0001));
+    REQUIRE(a.norm().z == Catch::Approx(0.80178373).margin(0.0001));
 }
 
 // ============== Performance Test ==============
