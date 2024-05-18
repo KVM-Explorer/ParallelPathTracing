@@ -4,6 +4,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <future>
 
 class TaskQueue {
   private:
@@ -12,7 +13,7 @@ class TaskQueue {
     std::condition_variable condition;
     std::mutex mutex;
     std::vector<std::thread> threads;
-    std::queue<std::function<void()>> tasks;
+    std::queue<std::packaged_task<void()>> tasks;
 
   public:
     TaskQueue() {
@@ -24,7 +25,7 @@ class TaskQueue {
         for (int i = 0; i < maxConCurency; i++) {
             threads.push_back(std::thread([this]() {
                 while (true) {
-                    std::function<void()> task;
+                    std::packaged_task<void()> task;
                     {
                         std::unique_lock<std::mutex> lock(this->mutex);
                         this->condition.wait(lock, [this] { return this->stop || !this->tasks.empty(); });
@@ -32,7 +33,8 @@ class TaskQueue {
                             return;
                         }
                         task = std::move(this->tasks.front());
-                        this->tasks.pop();
+                     
+                        this->tasks.pop();          // 没有考虑到读取过程中,任务队列添加元素导致扩容似的内存失效
                     }
                     task();
                 }
@@ -41,13 +43,14 @@ class TaskQueue {
     }
 
     void add(std::function<void()> func) {
-        tasks.emplace(func);
+        std::unique_lock<std::mutex> lock(mutex);
+        tasks.emplace(std::move(func));
     }
 
     void joinAll() {
 
         stop.store(true);
-
+        condition.notify_all();         // 记得重新唤醒,因为条件变量检查过后进入休眠
         for (int i = 0; i < threads.size(); i++) {
             threads[i].join();
         }
