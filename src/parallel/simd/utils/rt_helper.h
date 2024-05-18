@@ -24,7 +24,9 @@ struct Sphere {
 
     Float intersect(const Ray &ray) const {
         Vec op = position - ray.origin;
-        Float t, eps = 1e-4, b = op.dot(ray.dir), det = b * b - op.dot(op) + radius * radius;
+        Float t, eps = 1e-4;
+        Float b = op.dot(ray.dir);
+        Float det = b * b - op.dot(op) + radius * radius;
         if (det < 0)
             return 0;
         else
@@ -44,6 +46,5 @@ struct Camera {
         cy = (cx % direction).norm() * .5135;
     }
 };
-
 
 } // namespace SIMD

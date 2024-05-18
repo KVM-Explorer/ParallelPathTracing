@@ -55,7 +55,7 @@ class RtOptimzationSSE : public RayTracer {
                             SIMD::VecSSE d = camera->cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                                              camera->cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera->direction;
 
-                            ret = ret + tracing(Ray(camera->position + d * 140, d.norm()), 0, scene);
+                            ret = ret + tracing(Ray(camera->position + d * 140, d.normSSE()), 0, scene);
                         }
                     }
                     auto vec = ret.get();
@@ -64,6 +64,7 @@ class RtOptimzationSSE : public RayTracer {
             }
         }
         std::cout << "\n";
+        std::cout << "Total rays: " << count << std::endl;
     }
 
     Vec testPixel(const Ray &r, Scene &Scene) override {
@@ -82,7 +83,7 @@ class RtOptimzationSSE : public RayTracer {
         // hit object
         const Sphere &object = scene[hit_object];
         SIMD::VecSSE x = r.origin + r.dir * min_dis;
-        SIMD::VecSSE n = (x - object.position).norm();
+        SIMD::VecSSE n = (x - object.position).normSSE();
         SIMD::VecSSE nl = n.dot(r.dir) < 0 ? n : n * -1; // 交点的法线方向，如果是从内部射入物体，则取反
         SIMD::VecSSE f = object.color;
         Float p = f.x() > f.y() && f.x() > f.z() ? f.x() : f.y() > f.z() ? f.y()
@@ -106,9 +107,9 @@ class RtOptimzationSSE : public RayTracer {
             Float r2 = random();
             Float r2s = sqrt(r2);
             SIMD::VecSSE w = nl;
-            SIMD::VecSSE u = ((fabs(w.x()) > .1 ? SIMD::VecSSE(0, 1) : SIMD::VecSSE(1)) % w).norm();
+            SIMD::VecSSE u = ((fabs(w.x()) > .1 ? SIMD::VecSSE(0, 1) : SIMD::VecSSE(1)) % w).normSSE();
             SIMD::VecSSE v = w % u;
-            SIMD::VecSSE d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).norm();
+            SIMD::VecSSE d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).normSSE();
             // printf("d: (%lf,%lf,%lf)\n", d.x, d.y, d.z);
 
             return object.emission + object.color.mult(tracing(Ray(x, d), depth, scene));
@@ -126,7 +127,7 @@ class RtOptimzationSSE : public RayTracer {
         // printf("ddn: %lf\n", ddn);
         if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) < 0)
             return object.emission + object.color.mult(tracing(reflRay, depth, scene));
-        SIMD::VecSSE tdir = (r.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).norm();
+        SIMD::VecSSE tdir = (r.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).normSSE();
         Float a = nt - nc, b = nt + nc, R0 = a * a / (b * b), c = 1 - (into ? -ddn : tdir.dot(n));
         Float Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re, P = .25 + .5 * Re, RP = Re / P, TP = Tr / (1 - P);
 

@@ -17,6 +17,7 @@ class RtCpu : public RayTracer {
     }
     void render() override {
 
+        int count = 0;
         for (int y = 0; y < image.height; y++) {                                  // Loop over image rows
             OutputStatus("RayTracer CPU", y, image.height, samples, image.width); // Output status
 
@@ -27,6 +28,7 @@ class RtCpu : public RayTracer {
 
                     for (int subx = 0; subx < 2; subx++) {
                         for (int s = 0; s < samples; s++) {
+                            count++;
                             Float r1 = 2 * random();
                             Float r2 = 2 * random();
 
@@ -44,6 +46,7 @@ class RtCpu : public RayTracer {
             }
         }
         std::cout << "\n";
+        std::cout << "Total rays: " << count << std::endl;
     }
 
     Vec testPixel(const Ray& r,Scene &Scene) override {
