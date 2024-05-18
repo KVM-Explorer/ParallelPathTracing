@@ -26,7 +26,7 @@ TEST_CASE("sse::norm", "[SSE]") {
     auto b = a.normSSE().get();
     REQUIRE(b.x == Catch::Approx(0.26726124).margin(0.0001));
     REQUIRE(b.y == Catch::Approx(0.53452248).margin(0.0001));
-    REQUIRE(b.z == Catch::Approx(0.80178373).margin(0.001));
+    REQUIRE(b.z == Catch::Approx(0.80178373).margin(0.001)); // SIMD 计算存在精度损失
 }
 
 TEST_CASE("sse::mult", "[SSE]") {

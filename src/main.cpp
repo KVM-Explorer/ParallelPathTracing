@@ -6,6 +6,8 @@
 #include "rt_cpu.h"
 #include "scene.h"
 #include <iostream>
+#include "parallel/thread/rt_thead.h"
+#include "parallel/thread/rt_openmp.h"
 
 
 enum class Mode {
@@ -24,10 +26,10 @@ int main(int argc, char *argv[]) {
     // configuration
 
     Image image("image.ppm", 1024, 768);
-    Mode mode = Mode::SIMD_SSE;
+    Mode mode = Mode::CPU;
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
     Scene scene = CornellBox();
-    int samples = 1;
+    int samples = 2;
     bool profile = true;
 
     // render
@@ -39,6 +41,15 @@ int main(int argc, char *argv[]) {
     }
     case Mode::SIMD_SSE: {
         raytracer = std::make_unique<RtOptimzationSSE>(image, cam, scene, samples);
+        break;
+    }
+    case Mode::RawThread: {
+        raytracer = std::make_unique<RtThread>(image, cam, scene, samples);
+        break;
+    }
+
+    case Mode::OpenMP: {
+        raytracer = std::make_unique<RtOpenMP>(image, cam, scene, samples);
         break;
     }
 

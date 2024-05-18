@@ -1,74 +1,58 @@
-#pragma once
+#include "image.h"
 #include "raytracer.h"
+#include "task_queue.h"
 #include "viz_helper.h"
-#include "utils/rt_helper.h"
-#include "rt_math.h"
 
-class RtCpu : public RayTracer {
+
+class RtThread : public RayTracer {
   private:
     Image &image;
     Camera camera;
     Scene &scene;
     int samples;
+    TaskQueue taskQueue;
 
   public:
-    RtCpu(Image &image, Camera camera, Scene &scene, int samples)
-        : image(image), camera(camera), scene(scene), samples(samples){
-    }
+    RtThread(Image &image, Camera camera, Scene &scene, int samples, int numThreads = 12)
+        : image(image), camera(camera), scene(scene), samples(samples), taskQueue(numThreads) {}
+
     void render() override {
 
         int count = 0;
         for (int y = 0; y < image.height; y++) {                                  // Loop over image rows
-            OutputStatus("RayTracer CPU", y, image.height, samples, image.width); // Output status
+            OutputStatus("RayTracer Raw Thread", y, image.height, samples, image.width); // Output status
 
             for (int x = 0; x < image.width; x++) // Loop cols
             {
                 for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
-                    Vec ret = Vec();
+                    taskQueue.add([&,x=x,y=y,suby=suby](){
+                        Vec ret = Vec();
+                        for (int subx = 0; subx < 2; subx++) {
+                            for (int s = 0; s < samples; s++) {
+                                count++;
+                                Float r1 = 2 * random();
+                                Float r2 = 2 * random();
 
-                    for (int subx = 0; subx < 2; subx++) {
-                        for (int s = 0; s < samples; s++) {
-                            count++;
-                            Float r1 = 2 * random();
-                            Float r2 = 2 * random();
+                                Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                                Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                                Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
+                                        camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                            Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-                            Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-                            Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
-                                    camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
-
-                            ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene);
-                
+                                ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene);
+                            }
                         }
-                    }
-                    image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
+                        image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
+                    });
                 }
             }
         }
+        taskQueue.joinAll();
         std::cout << "\n";
         std::cout << "Total rays: " << count << std::endl;
     }
 
-    Vec testPixel(const Ray& r,Scene &Scene) override {
-        // x: 809, y: 0, subx: 1, suby: 1, s: 0 d:(0.189355,-0.283993,-0.939943) tracing:(0.000000,0.000000,0.000000)
-
-        // int x = 809;
-        // int y = 0;
-        // int subx = 1;
-        // int suby = 1;
-        // int s = 0;
-        // Vec d = Vec(0.189355, -0.283993, -0.939943);
-
-        // x: 5, y: 0, subx: 0, suby: 1, s: 0 d:(-0.311788,-0.274857,-0.909529) tracing:(0.438120,0.146040,1.314361)
-
-        int x = 5;
-        int y = 0;
-        int subx = 0;
-        int suby = 1;
-        int s = 0;
-        Vec d = Vec(-0.311788, -0.274857, -0.909529);
-
-        return tracing(Ray(Vec(50, 52, 295.6) + d * 140, d.norm()), 0, Scene);
+    Vec testPixel(const Ray &r, Scene &Scene) override {
+        return Vec();
     }
 
     Vec tracing(const Ray &r, int depth, Scene &scene) {
@@ -85,7 +69,7 @@ class RtCpu : public RayTracer {
         Vec nl = n.dot(r.dir) < 0 ? n : n * -1; // 交点的法线方向，如果是从内部射入物体，则取反
         Vec f = object.color;
         Float p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
-                                                            : f.z;
+                                                           : f.z;
 
         // printf("x: (%lf,%lf,%lf), p: %lf t: %d id: %d\n", x.x, x.y, x.z, p,min_dis,hit_object);
         if (++depth > 5) {
