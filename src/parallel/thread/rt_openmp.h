@@ -16,10 +16,11 @@ class RtOpenMP : public RayTracer {
     Scene &scene;
     int samples;
     OpenMPMode mode;
+    int taskSize;
 
   public:
-    RtOpenMP(Image &image, Camera camera, Scene &scene, int samples, OpenMPMode mode)
-        : image(image), camera(camera), scene(scene), samples(samples), mode(mode) {}
+    RtOpenMP(Image &image, Camera camera, Scene &scene, int samples, OpenMPMode mode, int task_size)
+        : image(image), camera(camera), scene(scene), samples(samples), mode(mode), taskSize(task_size) {}
 
     void render() override {
 
@@ -49,8 +50,9 @@ class RtOpenMP : public RayTracer {
     }
 
     void openmpParallelFor() {
+
         // clang-format off
-        #pragma omp parallel for
+        #pragma omp parallel  for
         for (int y = 0; y < image.height; y++) {
             for (int x = 0; x < image.width; x++) {
                 for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
@@ -67,12 +69,10 @@ class RtOpenMP : public RayTracer {
                                     camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
                             Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
-                            ;
-                            #pragma omp atomic
+                            
                             ret = ret + color;
                         }
                     }
-                    #pragma omp atomic
                     image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                 }
             }
@@ -85,38 +85,37 @@ class RtOpenMP : public RayTracer {
 
         #pragma omp parallel
         {
+            Vec ret;
             // #pragma omp single
-            #pragma omp for schedule(dynamic, taskSize)   // tasksize   
-            {
-                for (int y = 0; y < image.height; y++) {
-                    #pragma omp task
-                    {
-                        for (int x = 0; x < image.width; x++) {
-                            for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
-                                Vec ret = Vec();
+            #pragma omp for schedule(dynamic, taskSize) private(ret)  // tasksize   
+            for (int y = 0; y < image.height; y++) {
+                #pragma omp task
+                {
+                    for (int x = 0; x < image.width; x++) {
+                        for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
+                            ret = Vec();
 
-                                for (int subx = 0; subx < 2; subx++) {
-                                    for (int s = 0; s < samples; s++) {
-                                        Float r1 = 2 * random();
-                                        Float r2 = 2 * random();
+                            for (int subx = 0; subx < 2; subx++) {
+                                for (int s = 0; s < samples; s++) {
+                                    Float r1 = 2 * random();
+                                    Float r2 = 2 * random();
 
-                                        Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-                                        Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-                                        Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
-                                                camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
+                                    Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                                    Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                                    Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
+                                            camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                                        Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
-                                        #pragma omp atomic
-                                        ret = ret + color;
-                                    }
+                                    Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
+                                    
+                                    ret = ret + color;
                                 }
-                                #pragma omp atomic
-                                image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                             }
+                            image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                         }
                     }
                 }
             }
+        
         }
         // clang-format on
     }
@@ -127,35 +126,33 @@ class RtOpenMP : public RayTracer {
         {
             // #pragma omp single
             #pragma omp for schedule(guided)   // work stealing 
-            {
-                for (int y = 0; y < image.height; y++) {
-                    #pragma omp task
-                    {
-                        for (int x = 0; x < image.width; x++) {
-                            for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
-                                Vec ret = Vec();
+        
+            for (int y = 0; y < image.height; y++) {
+                #pragma omp task
+                {
+                    for (int x = 0; x < image.width; x++) {
+                        for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
+                            Vec ret = Vec();
 
-                                for (int subx = 0; subx < 2; subx++) {
-                                    for (int s = 0; s < samples; s++) {
-                                        Float r1 = 2 * random();
-                                        Float r2 = 2 * random();
+                            for (int subx = 0; subx < 2; subx++) {
+                                for (int s = 0; s < samples; s++) {
+                                    Float r1 = 2 * random();
+                                    Float r2 = 2 * random();
 
-                                        Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
-                                        Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
-                                        Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
-                                                camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
+                                    Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                                    Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                                    Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
+                                            camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                                        Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
-                                        #pragma omp atomic
-                                        ret = ret + color;
-                                    }
+                                    Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
+                                    ret = ret + color;
                                 }
-                                #pragma omp atomic
-                                image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                             }
+                            image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                         }
                     }
                 }
+            
             }
         }
         // clang-format on

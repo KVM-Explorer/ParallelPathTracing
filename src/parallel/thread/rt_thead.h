@@ -6,7 +6,7 @@
 #include <stack>
 #include <tuple>
 
-enum class LoadType {
+enum class ThreadLoadType {
     Row,
     Column,
     Block,
@@ -20,21 +20,21 @@ class RtThread : public RayTracer {
     int samples;
     TaskQueue taskQueue;
     std::atomic<int> count = 0;
-    LoadType loadType;
+    ThreadLoadType loadType;
     int taskSize;
 
   public:
     // RayTracer constructor with image, camera, scene, samples, thread_count, task_size and loadType
     // TaskSize must be a square number
-    RtThread(Image &image, Camera camera, Scene &scene, int samples, int thread_count, int task_size, LoadType loadType = LoadType::Row)
+    RtThread(Image &image, Camera camera, Scene &scene, int samples, int thread_count, int task_size, ThreadLoadType loadType = ThreadLoadType::Row)
         : image(image), camera(camera),
           scene(scene), samples(samples),
           taskQueue(thread_count),
           taskSize(task_size), loadType(loadType) {
-        if (loadType == LoadType::Block) {
+        if (loadType == ThreadLoadType::Block) {
             taskSize = sqrt(task_size);
             if (taskSize * taskSize != task_size)
-                throw std::runtime_error("TaskSize must be a square number");
+                std::cout << std::format("[Warning] TaskSize must be a square number, but got {}, current set {}\n", task_size,taskSize);
         }
     }
 
@@ -42,8 +42,8 @@ class RtThread : public RayTracer {
         return std::format("RayTracer RawThread Mode ({} threads, task size: {}, load type: {})",
                            taskQueue.getMaxConCurency(),
                            taskSize,
-                           loadType == LoadType::Row ? "Row" : loadType == LoadType::Column ? "Column"
-                                                                                            : "Block");
+                           loadType == ThreadLoadType::Row ? "Row" : loadType == ThreadLoadType::Column ? "Column"
+                                                                                                        : "Block");
     }
 
     void render() override {
@@ -62,7 +62,7 @@ class RtThread : public RayTracer {
 
     void dispatchTask() {
         switch (loadType) {
-        case LoadType::Row: {
+        case ThreadLoadType::Row: {
             for (int y = 0; y < image.height; y++) {
                 for (int x = 0; x < image.width; x += taskSize) {
                     if (x < image.width && x + taskSize > image.width) {
@@ -82,7 +82,7 @@ class RtThread : public RayTracer {
             }
             break;
         }
-        case LoadType::Column: {
+        case ThreadLoadType::Column: {
             for (int x = 0; x < image.width; x++) {
                 for (int y = 0; y < image.height; y += taskSize) {
                     if (y < image.height && y + taskSize >= image.height) {
@@ -102,9 +102,20 @@ class RtThread : public RayTracer {
             }
             break;
         }
-        case LoadType::Block: {
+        case ThreadLoadType::Block: {
             for (int y = 0; y < image.height; y += taskSize) {
                 for (int x = 0; x < image.width; x += taskSize) {
+
+                    if (x < image.width && x + taskSize >= image.width && y < image.height && y + taskSize >= image.height) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < image.width - x; i++) {
+                                for (int j = 0; j < image.height - y; j++) {
+                                    sampleAA(x + i, y + j);
+                                }
+                            }
+                        });
+                        continue;
+                    }
 
                     if (x < image.width && x + taskSize >= image.width) {
                         taskQueue.add([this, x = x, y = y]() {
@@ -126,16 +137,7 @@ class RtThread : public RayTracer {
                         });
                         continue;
                     }
-                    if (x < image.width && x + taskSize >= image.width && y < image.height && y + taskSize >= image.height) {
-                        taskQueue.add([this, x = x, y = y]() {
-                            for (int i = 0; i < image.width - x; i++) {
-                                for (int j = 0; j < image.height - y; j++) {
-                                    sampleAA(x + i, y + j);
-                                }
-                            }
-                        });
-                        continue;
-                    }
+                    
                     taskQueue.add([this, x = x, y = y]() {
                         for (int i = 0; i < taskSize; i++) {
                             for (int j = 0; j < taskSize; j++) {
@@ -165,7 +167,7 @@ class RtThread : public RayTracer {
                     Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                             camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                    ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1./samples);
+                    ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
                 }
             }
             image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);

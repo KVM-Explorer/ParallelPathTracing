@@ -1,6 +1,7 @@
 #include <math.h>   // smallpt, a Path Tracer by Kevin Beason, 2008
 #include <stdio.h>  //        Remove "-fopenmp" for g++ version < 4.2
 #include <stdlib.h> // Make : g++ -O3 -fopenmp smallpt.cpp -o smallpt
+#include <chrono>
 struct Vec {        // Usage: time ./smallpt 5000 && xv image.ppm
     double x, y, z; // position, also color (r,g,b)
     Vec(double x_ = 0, double y_ = 0, double z_ = 0) {
@@ -88,6 +89,11 @@ Vec radiance(const Ray &r, int depth, unsigned short *Xi) {
             f = f * (1 / p);
         else
             return obj.e;   // R.R.
+
+
+    if (depth > 50)
+        return obj.e;
+    
     if (obj.refl == DIFF) { // Ideal DIFFUSE reflection
         double r1 = 2 * PI * random(), r2 = random(), r2s = sqrt(r2);
         Vec w = nl, u = ((fabs(w.x) > .1 ? Vec(0, 1) : Vec(1)) % w).norm(), v = w % u;
@@ -118,10 +124,12 @@ Vec radiance(const Ray &r, int depth, unsigned short *Xi) {
                                     : radiance(reflRay, depth, Xi) * Re + radiance(Ray(x, tdir), depth, Xi) * Tr);
 }
 int main(int argc, char *argv[]) {
-    int w = 1024/2, h = 768/2, samps = argc == 2 ? atoi(argv[1]) / 4 : 16; // # samples
+    int w = 512, h = 512, samps = argc == 2 ? atoi(argv[1]) / 4 : 1; // # samples
     Ray cam(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm());        // cam pos, dir
     Vec cx = Vec(w * .5135 / h), cy = (cx % cam.d).norm() * .5135, r, *c = new Vec[w * h];
-    #pragma omp parallel for schedule(dynamic, 1) private(r) // OpenMP
+
+    auto start = std::chrono::high_resolution_clock::now();
+    #pragma omp parallel for schedule(guided) private(r) // OpenMP
         for (int y = 0; y < h; y++) {                        // Loop over image rows
             fprintf(stderr, "\rRendering (%d spp) %5.2f%%", samps * 4, 100. * y / (h - 1));
             for (unsigned short x = 0,
@@ -145,6 +153,9 @@ int main(int argc, char *argv[]) {
                         c[i] = c[i] + Vec(clamp(r.x), clamp(r.y), clamp(r.z)) * .25;
                     }
         }
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    printf("\nrendering time %.2lf s\n",duration / 1e3);
 
     // test pixel
     // x: 809, y: 0, subx: 1, suby: 1, s: 0 d:(0.189355,-0.283993,-0.939943) tracing:(0.000000,0.000000,0.000000)
