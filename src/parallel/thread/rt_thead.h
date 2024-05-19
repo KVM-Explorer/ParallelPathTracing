@@ -165,7 +165,7 @@ class RtThread : public RayTracer {
                     Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                             camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                    ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene);
+                    ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1./samples);
                 }
             }
             image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
