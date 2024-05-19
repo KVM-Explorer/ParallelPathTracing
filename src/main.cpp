@@ -17,19 +17,27 @@ enum class Mode {
     RawThread,
     OpenMP,
     Async,
-    ThreadPool_TBB_QUEUE,
 };
 
 int main(int argc, char *argv[]) {
 
     // configuration
 
-    Image image("image.ppm", 1024, 768);
-    Mode mode = Mode::RawThread;
+    Image image("image.ppm", 512, 512);
+    Mode mode = Mode::OpenMP;
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
     Scene scene = CornellBox();
-    int samples = 1;
+    int samples = 1; // 2 * 2 * samples per pixel
     bool profile = true;
+    int threadNum = 8;
+    LoadType splitLoadType = LoadType::Block;
+    int taskSize = 1 * 1;
+
+    if (argc > 1) {
+        // Parse the taskSize argument
+        samples = std::atoi(argv[1]);
+        std::cout << std::format("Input samples: {} sample rays: {}\n", samples, samples * 4);
+    }
 
     // render
     std::unique_ptr<RayTracer> raytracer;
@@ -43,12 +51,12 @@ int main(int argc, char *argv[]) {
         break;
     }
     case Mode::RawThread: {
-        raytracer = std::make_unique<RtThread>(image, cam, scene, samples);
+        raytracer = std::make_unique<RtThread>(image, cam, scene, samples, threadNum, taskSize, LoadType::Row);
         break;
     }
 
     case Mode::OpenMP: {
-        raytracer = std::make_unique<RtOpenMP>(image, cam, scene, samples);
+        raytracer = std::make_unique<RtOpenMP>(image, cam, scene, samples,OpenMPMode::ParallelFor);
         break;
     }
 
@@ -58,9 +66,8 @@ int main(int argc, char *argv[]) {
 
     if (profile) {
         int counts = image.width * image.height * samples * 4;
-        Profile Instance([&]() {
-            raytracer->render();
-        },"RayTracer CPU", counts);
+        Profile Instance([&]() { raytracer->render(); },
+                         raytracer->name(), counts);
         Instance.run();
         Instance.print();
     } else {

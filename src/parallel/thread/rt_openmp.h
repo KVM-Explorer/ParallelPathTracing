@@ -1,6 +1,13 @@
 #include "image.h"
 #include "raytracer.h"
 #include "viz_helper.h"
+#include <omp.h>
+
+enum class OpenMPMode {
+    ParallelFor,
+    ParallelTask,
+    ParallelWorkStealing,
+};
 
 class RtOpenMP : public RayTracer {
   private:
@@ -8,27 +15,49 @@ class RtOpenMP : public RayTracer {
     Camera camera;
     Scene &scene;
     int samples;
+    OpenMPMode mode;
 
   public:
-    RtOpenMP(Image &image, Camera camera, Scene &scene, int samples)
-        : image(image), camera(camera), scene(scene), samples(samples) {}
+    RtOpenMP(Image &image, Camera camera, Scene &scene, int samples, OpenMPMode mode)
+        : image(image), camera(camera), scene(scene), samples(samples), mode(mode) {}
 
     void render() override {
 
         int count = 0;
-        #pragma omp parallel for schedule(dynamic, 1) private(r) // OpenMP
+        switch (mode) {
+        case OpenMPMode::ParallelFor:
+            openmpParallelFor();
+            break;
+        case OpenMPMode::ParallelTask:
+            openmpTask();
+            break;
+        case OpenMPMode::ParallelWorkStealing:
+            openmpWorkStealing();
+            break;
+        }
 
-        for (int y = 0; y < image.height; y++) {                                  // Loop over image rows
-            OutputStatus("RayTracer CPU", y, image.height, samples, image.width); // Output status
+        std::cout << "\n";
+        std::cout << "Total rays: " << count << std::endl;
+    }
 
-            for (int x = 0; x < image.width; x++) // Loop cols
-            {
+    std::string name() override {
+        return "RayTracer OpenMP";
+    }
+
+    Vec testPixel(const Ray &r, Scene &Scene) override {
+        return Vec();
+    }
+
+    void openmpParallelFor() {
+        // clang-format off
+        #pragma omp parallel for
+        for (int y = 0; y < image.height; y++) {
+            for (int x = 0; x < image.width; x++) {
                 for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
                     Vec ret = Vec();
 
                     for (int subx = 0; subx < 2; subx++) {
                         for (int s = 0; s < samples; s++) {
-                            count++;
                             Float r1 = 2 * random();
                             Float r2 = 2 * random();
 
@@ -37,19 +66,99 @@ class RtOpenMP : public RayTracer {
                             Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                                     camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
 
-                            ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0, scene);
+                            Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
+                            ;
+                            #pragma omp atomic
+                            ret = ret + color;
                         }
                     }
+                    #pragma omp atomic
                     image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                 }
             }
         }
-        std::cout << "\n";
-        std::cout << "Total rays: " << count << std::endl;
+        // clang-format on
     }
 
-    Vec testPixel(const Ray &r, Scene &Scene) override {
-        return Vec();
+    void openmpTask() {
+        // clang-format off
+
+        #pragma omp parallel
+        {
+            // #pragma omp single
+            #pragma omp for schedule(dynamic, taskSize)   // tasksize   
+            {
+                for (int y = 0; y < image.height; y++) {
+                    #pragma omp task
+                    {
+                        for (int x = 0; x < image.width; x++) {
+                            for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
+                                Vec ret = Vec();
+
+                                for (int subx = 0; subx < 2; subx++) {
+                                    for (int s = 0; s < samples; s++) {
+                                        Float r1 = 2 * random();
+                                        Float r2 = 2 * random();
+
+                                        Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                                        Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                                        Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
+                                                camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
+
+                                        Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
+                                        #pragma omp atomic
+                                        ret = ret + color;
+                                    }
+                                }
+                                #pragma omp atomic
+                                image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // clang-format on
+    }
+
+    void openmpWorkStealing() {
+        // clang-format off
+        #pragma omp parallel
+        {
+            // #pragma omp single
+            #pragma omp for schedule(guided)   // work stealing 
+            {
+                for (int y = 0; y < image.height; y++) {
+                    #pragma omp task
+                    {
+                        for (int x = 0; x < image.width; x++) {
+                            for (int suby = 0; suby < 2; suby++) { // 2x2 subpixel rows
+                                Vec ret = Vec();
+
+                                for (int subx = 0; subx < 2; subx++) {
+                                    for (int s = 0; s < samples; s++) {
+                                        Float r1 = 2 * random();
+                                        Float r2 = 2 * random();
+
+                                        Float dx = r1 < 1 ? sqrt(r1) - 1 : 1 - sqrt(2 - r1);
+                                        Float dy = r2 < 1 ? sqrt(r2) - 1 : 1 - sqrt(2 - r2);
+                                        Vec d = camera.cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
+                                                camera.cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera.direction;
+
+                                        Vec color = tracing(Ray(camera.position + d * 140, d.norm()), 0, scene) * (1. / samples);
+                                        #pragma omp atomic
+                                        ret = ret + color;
+                                    }
+                                }
+                                #pragma omp atomic
+                                image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // clang-format on
     }
 
     Vec tracing(const Ray &r, int depth, Scene &scene) {
@@ -68,7 +177,6 @@ class RtOpenMP : public RayTracer {
         Float p = f.x > f.y && f.x > f.z ? f.x : f.y > f.z ? f.y
                                                            : f.z;
 
-        // printf("x: (%lf,%lf,%lf), p: %lf t: %d id: %d\n", x.x, x.y, x.z, p,min_dis,hit_object);
         if (++depth > 5) {
             if (random() < p)
                 f = f * (1 / p);
@@ -89,7 +197,6 @@ class RtOpenMP : public RayTracer {
             Vec u = ((fabs(w.x) > .1 ? Vec(0, 1) : Vec(1)) % w).norm();
             Vec v = w % u;
             Vec d = (u * cos(r1) * r2s + v * sin(r1) * r2s + w * sqrt(1 - r2)).norm();
-            // printf("d: (%lf,%lf,%lf)\n", d.x, d.y, d.z);
 
             return object.emission + object.color.mult(tracing(Ray(x, d), depth, scene));
         }
@@ -103,14 +210,11 @@ class RtOpenMP : public RayTracer {
         Ray reflRay(x, r.dir - n * 2 * n.dot(r.dir));
         bool into = n.dot(nl) > 0;
         Float nc = 1, nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = r.dir.dot(nl), cos2t;
-        // printf("ddn: %lf\n", ddn);
         if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) < 0)
             return object.emission + object.color.mult(tracing(reflRay, depth, scene));
         Vec tdir = (r.dir * nnt - n * ((into ? 1 : -1) * (ddn * nnt + sqrt(cos2t)))).norm();
         Float a = nt - nc, b = nt + nc, R0 = a * a / (b * b), c = 1 - (into ? -ddn : tdir.dot(n));
         Float Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re, P = .25 + .5 * Re, RP = Re / P, TP = Tr / (1 - P);
-
-        // printf("Re: %lf, Tr: %lf, P: %lf, RP: %lf, TP: %lf\n", Re, Tr, P, RP, TP);
 
         return object.emission + object.color.mult(depth > 2 ? (random() < P ? tracing(reflRay, depth, scene) * RP : tracing(Ray(x, tdir), depth, scene) * TP) : tracing(reflRay, depth, scene) * Re + tracing(Ray(x, tdir), depth, scene) * Tr);
     }
