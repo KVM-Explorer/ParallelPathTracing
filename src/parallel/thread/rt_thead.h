@@ -2,8 +2,15 @@
 #include "raytracer.h"
 #include "task_queue.h"
 #include "viz_helper.h"
+#include <future>
 #include <stack>
 #include <tuple>
+
+enum class LoadType {
+    Row,
+    Column,
+    Block,
+};
 
 class RtThread : public RayTracer {
   private:
@@ -13,31 +20,134 @@ class RtThread : public RayTracer {
     int samples;
     TaskQueue taskQueue;
     std::atomic<int> count = 0;
+    LoadType loadType;
+    int taskSize;
 
   public:
-    RtThread(Image &image, Camera camera, Scene &scene, int samples, int numThreads = 32)
-        : image(image), camera(camera), scene(scene), samples(samples), taskQueue(numThreads) {}
+    // RayTracer constructor with image, camera, scene, samples, thread_count, task_size and loadType
+    // TaskSize must be a square number
+    RtThread(Image &image, Camera camera, Scene &scene, int samples, int thread_count, int task_size, LoadType loadType = LoadType::Row)
+        : image(image), camera(camera),
+          scene(scene), samples(samples),
+          taskQueue(thread_count),
+          taskSize(task_size), loadType(loadType) {
+        if (loadType == LoadType::Block) {
+            taskSize = sqrt(task_size);
+            if (taskSize * taskSize != task_size)
+                throw std::runtime_error("TaskSize must be a square number");
+        }
+    }
+
+    std::string name() override {
+        return std::format("RayTracer RawThread Mode ({} threads, task size: {}, load type: {})",
+                           taskQueue.getMaxConCurency(),
+                           taskSize,
+                           loadType == LoadType::Row ? "Row" : loadType == LoadType::Column ? "Column"
+                                                                                            : "Block");
+    }
 
     void render() override {
 
         int x, y;
-        for (y = 0; y < image.height; y++) {                                         // Loop over image rows
-            OutputStatus("RayTracer Raw Thread", y, image.height, samples, image.width); // Output status
-
-            for (x = 0; x < image.width; x++) // Loop cols
-            {
-                auto func = [this, x=x, y=y]() { sampleAA(x, y); };
-                taskQueue.add(func);
-            }
-        }
+        dispatchTask();
 
         taskQueue.joinAll();
-        std::cout << "Total rays: " << count << "\n"; // Output the total number of rays traced
         std::cout << "\n";
+        std::cout << "Total rays: " << count << "\n"; // Output the total number of rays traced
     }
 
     Vec testPixel(const Ray &r, Scene &Scene) override {
         return Vec();
+    }
+
+    void dispatchTask() {
+        switch (loadType) {
+        case LoadType::Row: {
+            for (int y = 0; y < image.height; y++) {
+                for (int x = 0; x < image.width; x += taskSize) {
+                    if (x < image.width && x + taskSize > image.width) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < image.width - x; i++) {
+                                sampleAA(x + i, y);
+                            }
+                        });
+                    } else {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < taskSize; i++) {
+                                sampleAA(x + i, y);
+                            }
+                        });
+                    }
+                }
+            }
+            break;
+        }
+        case LoadType::Column: {
+            for (int x = 0; x < image.width; x++) {
+                for (int y = 0; y < image.height; y += taskSize) {
+                    if (y < image.height && y + taskSize >= image.height) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < image.height - y; i++) {
+                                sampleAA(x, y + i);
+                            }
+                        });
+                    } else {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < taskSize; i++) {
+                                sampleAA(x, y + i);
+                            }
+                        });
+                    }
+                }
+            }
+            break;
+        }
+        case LoadType::Block: {
+            for (int y = 0; y < image.height; y += taskSize) {
+                for (int x = 0; x < image.width; x += taskSize) {
+
+                    if (x < image.width && x + taskSize >= image.width) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < image.width - x; i++) {
+                                for (int j = 0; j < taskSize; j++) {
+                                    sampleAA(x + i, y + j);
+                                }
+                            }
+                        });
+                        continue;
+                    }
+                    if (y < image.height && y + taskSize >= image.height) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < taskSize; i++) {
+                                for (int j = 0; j < image.height - y; j++) {
+                                    sampleAA(x + i, y + j);
+                                }
+                            }
+                        });
+                        continue;
+                    }
+                    if (x < image.width && x + taskSize >= image.width && y < image.height && y + taskSize >= image.height) {
+                        taskQueue.add([this, x = x, y = y]() {
+                            for (int i = 0; i < image.width - x; i++) {
+                                for (int j = 0; j < image.height - y; j++) {
+                                    sampleAA(x + i, y + j);
+                                }
+                            }
+                        });
+                        continue;
+                    }
+                    taskQueue.add([this, x = x, y = y]() {
+                        for (int i = 0; i < taskSize; i++) {
+                            for (int j = 0; j < taskSize; j++) {
+                                sampleAA(x + i, y + j);
+                            }
+                        }
+                    });
+                }
+            }
+            break;
+        }
+        }
     }
 
     void sampleAA(int x, int y) {

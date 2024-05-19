@@ -32,10 +32,3 @@ struct Sphere {
     }
 };
 
-struct HitRecord {
-    Vec emission;
-    Vec diffuse;
-
-    HitRecord(Vec emission = Vec(), Vec color = Vec())
-        : emission(emission), diffuse(color) {}
-};

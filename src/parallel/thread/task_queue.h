@@ -21,6 +21,11 @@ class TaskQueue {
         maxConCurency = size != 0 ? size : 1;
         TaskQueue(maxConCurency);
     }
+
+    int getMaxConCurency() {
+        return maxConCurency;
+    }
+
     TaskQueue(int max_concurency) : maxConCurency(max_concurency) {
         for (int i = 0; i < maxConCurency; i++) {
             threads.push_back(std::thread([this]() {

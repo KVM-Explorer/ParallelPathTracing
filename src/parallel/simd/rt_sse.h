@@ -33,6 +33,10 @@ class RtOptimzationSSE : public RayTracer {
         }
     }
 
+    std::string name() override {
+        return "RayTracer SIMD SSE";
+    }
+
     void render() override {
         using SIMD::Ray;
         int count = 0;

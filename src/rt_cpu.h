@@ -15,6 +15,11 @@ class RtCpu : public RayTracer {
     RtCpu(Image &image, Camera camera, Scene &scene, int samples)
         : image(image), camera(camera), scene(scene), samples(samples){
     }
+
+    std::string name() override {
+        return "RayTracer CPU";
+    }
+
     void render() override {
 
         int count = 0;
