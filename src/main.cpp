@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
     // configuration
 
     Image image("image.ppm", 512, 512);
-    Mode mode = Mode::RawThread;
+    Mode mode = Mode::CPU;
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
     Scene scene = CornellBox();
     int samples = 1; // 2 * 2 * samples per pixel

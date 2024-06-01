@@ -29,5 +29,20 @@ for _, file in ipairs(files) do
 
 end
 
-    
+
+
+-- target("test_cpu_none")
+--     add_files("test_cpu.cpp")
+--     set_kind("binary")
+--     add_deps("catch2")
+--     add_rules("mode.profile")
+
+-- target("test_sse_only")
+--     add_files("test_sse.cpp")
+--     add_rules("mode.profile")
+--     set_kind("binary")
+--     add_deps("catch2")
+--     add_vectorexts("all")
+
+
 
