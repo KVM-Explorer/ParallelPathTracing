@@ -9,8 +9,8 @@ constexpr int32_t BUFFER_NUM = 4;
 class KernelRender {
 
   public:
-    __ai_core__ inline KernelRender() {}
-    __ai_core__ inline void Init(int w, int h, int s, GM_ADDR input,
+    __aicore__ inline KernelRender() {}
+    __aicore__ inline void Init(int w, int h, int s, GM_ADDR input,
                                  GM_ADDR output) {
 
         width = w;
@@ -32,7 +32,7 @@ class KernelRender {
         pipe.InitBuffer(outQueueY, BUFFER_NUM, tiling_length * sizeof(Vec));
     }
 
-    __ai_core__ inline void Process() {
+    __aicore__ inline void Process() {
 
         int loop_count = TILING_NUM * BUFFER_NUM;
         // constexpr int32_t ONCE_NUM =
@@ -44,13 +44,13 @@ class KernelRender {
         }
     }
 
-    __ai_core__ inline void Release() {
+    __aicore__ inline void Release() {
         // free local tensor
     }
 
   private:
     // system mem -> device mem
-    __ai_core__ inline void CopyIn(int32_t progress) {
+    __aicore__ inline void CopyIn(int32_t progress) {
         constexpr int32_t tiling_length =
             TOTAL_NUM / USE_CORE_NUM / TILING_NUM / BUFFER_NUM;
 
@@ -62,7 +62,7 @@ class KernelRender {
     }
 
     // read device mem & compute & output to device queue & all samples
-    __ai_core__ inline void Compute(int32_t progress) {
+    __aicore__ inline void Compute(int32_t progress) {
 
         LocalTensor<Vec> ret = outQueueY.AllocTensor<Vec>();
         LocalTensor<Ray> ray = inQueueX.DeQue<Ray>();
@@ -71,10 +71,16 @@ class KernelRender {
             TOTAL_NUM / USE_CORE_NUM / TILING_NUM / BUFFER_NUM;
         // const int32_t data_offset = data_num * progress;
 
-        // Vec color(0, 0, 0);
+        Vec color(0, 0, 0);
         for (int i = 0; i < data_num; i++) {
             auto cur_ray = ray.GetValue(i);
-            ret.SetValue(i, cur_ray.d);
+            // color = radiance(cur_ray, 0);
+            color = radiance(cur_ray, 0);
+            // #ifdef __CCE_KT_TEST__
+            //             printf("color: (%.5f, %.5f, %.5f)\n", color.x,
+            //             color.y, color.z);
+            // #endif
+            ret.SetValue(i, color);
         }
 
         inQueueX.FreeTensor(ray);
@@ -82,7 +88,7 @@ class KernelRender {
     }
 
     // write device queue to system mem
-    __ai_core__ inline void CopyOut(int32_t progress) {
+    __aicore__ inline void CopyOut(int32_t progress) {
         // deque output tensor from VECOUT queue
         LocalTensor<Vec> color = outQueueY.DeQue<Vec>();
         // copy progress_th tile from local tensor to global tensor

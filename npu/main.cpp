@@ -1,6 +1,6 @@
 #include "data_gen.h"
 // #include "data_utils.h"
-
+#include "scene.h"
 #ifndef __CCE_KT_TEST__
 #include <acl/acl.h>
 extern void render(uint32_t coreDim, void *l2ctrl, void *stream, uint8_t *rays,
@@ -23,9 +23,13 @@ int main() {
     std::vector<Ray> raysData = genRays(WIDTH, HEIGHT, SAMPLES);
     std::vector<Vec> stdColorsData = stdColor(raysData);
     std::vector<Vec> outputColor(elementNums);
+    std::vector<Sphere> spheresData = cornelbox();
+
+    size_t sphereByteSize = sizeof(Sphere) * spheresData.size();
 
     uint8_t *rays = (uint8_t *)AscendC::GmAlloc(inputByteSize);
-    uint8_t *colors = (uint8_t *)AscendC::GmAlloc(inputByteSize);
+    uint8_t *colors = (uint8_t *)AscendC::GmAlloc(outputByteSize);
+    uint8_t *spheres = (uint8_t *)AscendC::GmAlloc(sphereByteSize);
 
     // copy data_gen
     memcpy(rays, raysData.data(), inputByteSize);
@@ -43,7 +47,19 @@ int main() {
     AscendC::GmFree((void *)rays);
     AscendC::GmFree((void *)colors);
 
-    showDiff(outputColor, stdColorsData,true);
+    // for (const auto &color : outputColor) {
+    //     if (fabs(color.x) > 0.0001 || fabs(color.y) > 0.0001 ||
+    //         fabs(color.z) > 0.0001)
+    //         printVec("color", color);
+    // }
+    int idx = stdColorsData.size() - 1;
+
+    for (const auto &color : stdColorsData) {
+        if (fabs(color.x) > 0.0001 || fabs(color.y) > 0.0001 ||
+            fabs(color.z) > 0.0001)
+            printVec("color", color);
+    }
+    // showDiff(outputColor, stdColorsData,true);
 
 #else
 

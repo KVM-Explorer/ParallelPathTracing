@@ -1,49 +1,23 @@
 #pragma once
+#include "scene.h"
 #include "types.h"
-struct Sphere {
-    FF rad;
-    Vec p, e, c;
-    MaterialType m;
-    __ai_host__ __ai_core__ Sphere(FF rad_, Vec p_, Vec e_, Vec c_,
-                                   MaterialType m_)
-        : rad(rad_), p(p_), e(e_), c(c_), m(m_) {}
-    __ai_host__ __ai_core__ FF intersect(const Ray &r) const {
-        Vec op = p - r.o;
-        FF t, epsilon = 1e-4, b = op.dot(r.d),
-              det = b * b - op.dot(op) + rad * rad;
-        if (det < FF(0))
-            return 0;
-        else
-            det = sqrt(det);
-        return (t = b - det) > epsilon ? t
-                                       : ((t = b + det) > epsilon ? t : FF(0));
-    }
-};
 
-static Sphere spheres[] = {
-    Sphere(1e5, Vec(1e5 + 1, 40.8, 81.6), Vec(), Vec(.75, .25, .25), DIFF),
-    Sphere(1e5, Vec(-1e5 + 99, 40.8, 81.6), Vec(), Vec(.25, .25, .75), DIFF),
-    Sphere(1e5, Vec(50, 40.8, 1e5), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(1e5, Vec(50, 40.8, -1e5 + 170), Vec(), Vec(), DIFF),
-    Sphere(1e5, Vec(50, 1e5, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(1e5, Vec(50, -1e5 + 81.6, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(16.5, Vec(27, 16.5, 47), Vec(), Vec(1, 1, 1) * .999, SPEC),
-    Sphere(16.5, Vec(73, 16.5, 78), Vec(), Vec(1, 1, 1) * .999, REFR),
-    Sphere(600, Vec(50, 681.6 - .27, 81.6), Vec(12, 12, 12), Vec(), DIFF)};
-
-constexpr int32_t num_spheres = sizeof(spheres) / sizeof(Sphere);
-
-__ai_host__ __ai_core__ inline FF clamp(FF x) {
+__ai_host__ __aicore__ inline FF clamp(FF x) {
     return x < FF(0) ? FF(0) : x > FF(1) ? FF(1) : x;
 }
-__ai_host__ __ai_core__ inline int toInt(FF x) {
+__ai_host__ __aicore__ inline int toInt(FF x) {
     return int(pow(clamp(x), FF(1 / 2.2)) * 255 + .5);
 }
 
-__ai_core__ inline bool intersect(const int num_spheres, const Sphere *spheres,
+__ai_host__ __aicore__ static void printVec(const std::string name,
+                                            const Vec &v) {
+    printf("%s : (%.5f, %.5f, %.5f)\n", name.c_str(), v.x, v.y, v.z);
+}
+
+__aicore__ inline bool intersect(const int num_spheres, const Sphere *spheres,
                                   const Ray &r, float &t, int &id) {
     float n = num_spheres, d, inf = t = 1e20;
-    for (int i = int(n); i--;)
+    for (int i = int(n); i--;) 
         if ((d = spheres[i].intersect(r)) && d < t) {
             t = d;
             id = i;
@@ -59,8 +33,10 @@ __ai_host__ __aicore__ inline Vec radiance(const Ray &input_r,
     Ray r = input_r;
     int depth = input_depth;
     Vec cl(0, 0, 0), cf(1, 1, 1);
+    auto spheres = cornelbox();
+    int num_spheres = spheres.size();
     while (1) {
-        if (!intersect(num_spheres, spheres, r, t, id))
+        if (!intersect(num_spheres, spheres.data(), r, t, id))
             return cl;                   // if miss, return black
         const Sphere &obj = spheres[id]; // the hit object
         Vec x = r.o + r.d * t, n = (x - obj.p).norm(),
@@ -124,7 +100,15 @@ __ai_host__ __aicore__ inline Vec radiance(const Ray &input_r,
     }
 }
 
-__ai_host__ __aicore__ static void printVec(const std::string name,
-                                            const Vec &v) {
-    printf("%s : (%.3f, %.3f, %.3f)\n", name.c_str(), v.x, v.y, v.z);
+__ai_host__ __aicore__ inline Vec testRadiance(const Ray &input_r,
+                                               int input_depth) {
+    // return Vec(input_r.d.x, input_r.d.y, input_r.d.z);
+    // Vec ret = Vec(input_r.d.x, input_r.d.y, input_r.d.z);
+    Vec ret = input_r.d;
+
+    auto spheres = cornelbox();
+
+    ret = spheres[0].p;
+
+    return ret;
 }

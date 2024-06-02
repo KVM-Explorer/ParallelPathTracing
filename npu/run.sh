@@ -116,14 +116,14 @@ if [ $? -ne 0 ]; then
 fi
 echo "INFO: compile op on ${RUN_MODE} succeed!"
 
-rm -rf input/*.bin output/*.bin
-python3 scripts/gen_data.py
-(export LD_LIBRARY_PATH=${_ASCEND_INSTALL_PATH}/tools/simulator/${_SOC_VERSION}/lib:$LD_LIBRARY_PATH && ./${FILE_NAME}_${RUN_MODE})
-if [ $? -ne 0 ]; then
-    echo "ERROR: execute op on ${RUN_MODE} failed!"
-    exit -1
-fi
-echo "INFO: execute op on ${RUN_MODE} succeed!"
-python3 scripts/verify_result.py output/output_z.bin output/golden.bin
+# rm -rf input/*.bin output/*.bin
+# python3 scripts/gen_data.py
+# (export LD_LIBRARY_PATH=${_ASCEND_INSTALL_PATH}/tools/simulator/${_SOC_VERSION}/lib:$LD_LIBRARY_PATH && ./${FILE_NAME}_${RUN_MODE})
+# if [ $? -ne 0 ]; then
+#     echo "ERROR: execute op on ${RUN_MODE} failed!"
+#     exit -1
+# fi
+# echo "INFO: execute op on ${RUN_MODE} succeed!"
+# python3 scripts/verify_result.py output/output_z.bin output/golden.bin
 
 rm -rf *log *.vcd

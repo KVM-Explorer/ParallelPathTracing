@@ -35,7 +35,7 @@ auto genRays(int w, int h, int s) -> std::vector<Ray> {
 auto stdColor(const std::vector<Ray> &rays) -> std::vector<Vec> {
     std::vector<Vec> colors;
     for (const auto &ray : rays) {
-        Vec color = ray.d;
+        Vec color = radiance(ray, 0);
         colors.push_back(color);
     }
     return colors;
