@@ -32,8 +32,9 @@ __ai_host__ __aicore__ inline Vec radiance(const Ray &input_r,
     int id = 0;
     Ray r = input_r;
     int depth = input_depth;
-    Vec cl(0, 0, 0), cf(1, 1, 1);
-    auto spheres = cornelbox();
+    Vec cl(0, 0, 0); // accumulated color
+    Vec cf(1, 1, 1); // accumulated reflectance
+    auto spheres = testSphere();
     int num_spheres = spheres.size();
     while (1) {
         if (!intersect(num_spheres, spheres.data(), r, t, id))

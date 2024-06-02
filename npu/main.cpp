@@ -21,6 +21,7 @@ int main() {
 #ifdef __CCE_KT_TEST__
 
     std::vector<Ray> raysData = genRays(WIDTH, HEIGHT, SAMPLES);
+
     std::vector<Vec> stdColorsData = stdColor(raysData);
     std::vector<Vec> outputColor(elementNums);
     std::vector<Sphere> spheresData = cornelbox();
@@ -52,13 +53,13 @@ int main() {
     //         fabs(color.z) > 0.0001)
     //         printVec("color", color);
     // }
-    int idx = stdColorsData.size() - 1;
+    // int idx = stdColorsData.size() - 1;
 
-    for (const auto &color : stdColorsData) {
-        if (fabs(color.x) > 0.0001 || fabs(color.y) > 0.0001 ||
-            fabs(color.z) > 0.0001)
-            printVec("color", color);
-    }
+    // for (const auto &color : stdColorsData) {
+    //     if (fabs(color.x) > 0.0001 || fabs(color.y) > 0.0001 ||
+    //         fabs(color.z) > 0.0001)
+    //         printVec("color", color);
+    // }
     // showDiff(outputColor, stdColorsData,true);
 
 #else

@@ -8,6 +8,9 @@ auto genRays(int w, int h, int s) -> std::vector<Ray> {
     Vec cx = Vec(w * .5135 / h);
     Vec cy = (cx.cross(camera.d)).norm() * .5135;
 
+    printVec("cx", cx);
+    printVec("cy", cy);
+
     for (int i = 0; i < w; i++) {
         for (int j = 0; j < h; j++) {
             for (int sy = 0; sy < 2; sy++) {
@@ -22,7 +25,7 @@ auto genRays(int w, int h, int s) -> std::vector<Ray> {
                                 cy * (((sy + .5 + dy) / 2 + j) / h - .5) +
                                 camera.d;
 
-                        rays.push_back(Ray(camera.o + r * 140, d.norm()));
+                        rays.push_back(Ray(camera.o + d * 140, d.norm()));
                     }
                 }
             }
