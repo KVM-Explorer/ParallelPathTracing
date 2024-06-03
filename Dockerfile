@@ -13,7 +13,7 @@ CMD ["/sbin/my_init"]
 
 # 这里可以放置你自己需要构建的命令
 
-RUN apt update && apt-get install -y gcc g++ make cmake zlib1g zlib1g-dev openssl libsqlite3-dev libssl-dev libffi-dev unzip pciutils net-tools libblas-dev gfortran libblas3 python3-pip
+RUN apt update && apt-get install -y git gcc g++ make cmake zlib1g zlib1g-dev openssl libsqlite3-dev libssl-dev libffi-dev unzip pciutils net-tools libblas-dev gfortran libblas3 python3-pip
 
 RUN pip3 install attrs numpy decorator sympy cffi pyyaml pathlib2 psutil protobuf scipy requests absl-py wheel typing_extensions -i https://pypi.tuna.tsinghua.edu.cn/simple
 
@@ -36,3 +36,4 @@ RUN echo "export ASCEND_INSTALL_PATH=/usr/local/Ascend/ascend-toolkit/latest" >>
 
 # 当完成后,清除APT.
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
