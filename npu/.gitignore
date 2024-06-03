@@ -1,0 +1,7 @@
+build
+add_cpu
+add_npu
+input
+output
+npuchk
+cceprint
