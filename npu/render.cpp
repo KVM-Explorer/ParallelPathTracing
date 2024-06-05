@@ -3,30 +3,17 @@
 // #include <cmath>
 #include <cstdint>
 using namespace AscendC;
-#ifdef __CCE_KT_TEST__
-#include <random>
-#include <stub_def.h>
-#else
 #include <cstdlib>
-#endif
-#include <vector>
 using namespace std;
 
-__aicore__ static FF randomFF() {
-#ifdef __CCE_KT_TEST__
-    static std::uniform_real_distribution<FF> dist(0, 1);
-    static std::mt19937_64 gen;
-    return dist(gen);
-#else
+using FF = float;
 
-    return static_cast<FF>(drand48());
-#endif
-}
+__aicore__ static FF randomFF() { return 0.5; }
 
 __aicore__ static FF FFabs(FF x) {
-    if (x > 0)
+    if (x > FF(0))
         return x;
-    return -x;
+    return FF(0) - x;
 }
 
 __aicore__ float InvSqrt(float x) {
@@ -42,21 +29,18 @@ __aicore__ float sqrt32_approx(float value) { return 1.0f / InvSqrt(value); }
 __aicore__ inline FF FFsqrt(FF x) { return sqrt32_approx(x); }
 
 inline FF clamp(FF x) { return x < FF(0) ? FF(0) : x > FF(1) ? FF(1) : x; }
-inline int toInt(FF x) { return int(pow(clamp(x), FF(1 / 2.2)) * 255 + .5); }
 
 struct Vec {
+    // LocalTensor<FF> data; //  x y z w
     FF x, y, z, w;
-    bool operator<(const Vec &other) const {
-        // Implement the comparison logic for your Vec class
-        // For example, you could compare the individual elements of the vectors
 
-        return false; // Vectors are equal
+    __aicore__ bool operator<(const Vec &b) const {
+        return x < b.x && y < b.y && z < b.z;
     }
 
-    __aicore__ Vec(FF x_ = 0, FF y_ = 0, FF z_ = 0) : x(x_), y(y_), z(z_) {}
+    __aicore__ Vec(FF x_ = 0, FF y_ = 0, FF z_ = 0, FF w_ = 0)
+        : x(x_), y(y_), z(z_), w(w_) {}
 
-    __aicore__ Vec(__ubuf__ const Vec &data)
-        : x(data.x), y(data.y), z(data.z), w(0) {}
     __aicore__ Vec operator+(const Vec &v) const {
         return Vec(x + v.x, y + v.y, z + v.z);
     };
@@ -86,7 +70,7 @@ __aicore__ static Vec randomVec() {
 struct Ray {
     Vec o, d;
     __aicore__ Ray(Vec o_, Vec d_) : o(o_), d(d_) {}
-    __aicore__ Ray(__ubuf__ Ray const &data) : o(data.o), d(data.d) {}
+    __aicore__ Ray(const Ray &data) : o(data.o), d(data.d) {}
 };
 
 struct Sphere {
@@ -109,22 +93,24 @@ struct Sphere {
 };
 
 int32_t num_spheres = 9;
-static Sphere spheres[] = {
-    Sphere(1e5, Vec(1e5 + 1, 40.8, 81.6), Vec(), Vec(.75, .25, .25),
-           DIFF), // Left
-    Sphere(1e5, Vec(-1e5 + 99, 40.8, 81.6), Vec(), Vec(.25, .25, .75),
-           DIFF), // Right
-    Sphere(1e5, Vec(50, 40.8, 1e5), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(1e5, Vec(50, 40.8, -1e5 + 170), Vec(), Vec(), DIFF),
-    Sphere(1e5, Vec(50, 1e5, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(1e5, Vec(50, -1e5 + 81.6, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
-    Sphere(16.5, Vec(27, 16.5, 47), Vec(), Vec(1, 1, 1) * .999,
-           SPEC), // Mirror
-    Sphere(16.5, Vec(73, 16.5, 78), Vec(), Vec(1, 1, 1) * .999,
-           REFR), // Glass
-    Sphere(600, Vec(50, 681.6 - .27, 81.6), Vec(12, 12, 12), Vec(),
-           DIFF)}; // Light
+// 不允许分配静态数组
+// static Sphere spheres[] = {
+//     Sphere(1e5, Vec(1e5 + 1, 40.8, 81.6), Vec(), Vec(.75, .25, .25),
+//            DIFF), // Left
+//     Sphere(1e5, Vec(-1e5 + 99, 40.8, 81.6), Vec(), Vec(.25, .25, .75),
+//            DIFF), // Right
+//     Sphere(1e5, Vec(50, 40.8, 1e5), Vec(), Vec(.75, .75, .75), DIFF),
+//     Sphere(1e5, Vec(50, 40.8, -1e5 + 170), Vec(), Vec(), DIFF),
+//     Sphere(1e5, Vec(50, 1e5, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
+//     Sphere(1e5, Vec(50, -1e5 + 81.6, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
+//     Sphere(16.5, Vec(27, 16.5, 47), Vec(), Vec(1, 1, 1) * .999,
+//            SPEC), // Mirror
+//     Sphere(16.5, Vec(73, 16.5, 78), Vec(), Vec(1, 1, 1) * .999,
+//            REFR), // Glass
+//     Sphere(600, Vec(50, 681.6 - .27, 81.6), Vec(12, 12, 12), Vec(),
+//            DIFF)}; // Light
 
+/*
 __aicore__ inline bool intersect(const Ray &r, float &t, int &id) {
     float n = num_spheres, d, inf = t = 1e20;
     for (int i = int(n); i--;)
@@ -163,7 +149,8 @@ __aicore__ inline Vec radiance(const Ray &input_r, int input_depth) {
             }
         cf = cf.mult(f);
         if (obj.m == DIFF) { // Ideal DIFFUSE reflection
-            float r1 = 2 * PI * randomFF(), r2 = randomFF(), r2s = FFsqrt(r2);
+            float r1 = FF(2 * PI) * randomFF(), r2 = randomFF(),
+                  r2s = FFsqrt(r2);
             Vec w = nl,
                 u = ((FFabs(w.x) > .1F ? Vec(0, 1) : Vec(1)).cross(w)).norm(),
                 v = w.cross(u);
@@ -210,6 +197,8 @@ __aicore__ inline Vec radiance(const Ray &input_r, int input_depth) {
         continue;
     }
 }
+
+*/
 
 constexpr int32_t TOTAL_NUM = WIDTH * HEIGHT * SAMPLES * 4;
 constexpr int32_t USE_CORE_NUM = 8;
@@ -281,16 +270,20 @@ class KernelRender {
             TOTAL_NUM / USE_CORE_NUM / TILING_NUM / BUFFER_NUM;
         // const int32_t data_offset = data_num * progress;
 
-        Vec color(0, 0, 0);
+        Vec color(0.6, 0.7, 0.5);
         for (int i = 0; i < data_num; i++) {
-            auto cur_ray = ray.GetValue(i);
-            // color = radiance(cur_ray, 0);
-            color = radiance(cur_ray, 0);
-            // #ifdef __CCE_KT_TEST__
-            //             printf("color: (%.5f, %.5f, %.5f)\n", color.x,
-            //             color.y, color.z);
-            // #endif
-            ret.SetValue(i, color);
+            // auto cur_ray = ray.GetValue(i);
+            auto cur1_ray = *(reinterpret_cast<Ray *>(ray.GetPhyAddr(i)));
+            // auto test_ray = reinterpret_cast<Ray
+            // (ray.GetLocalBufferAddr(i)); ray.GetLocalBufferAddr(i);
+            // ray.GetBufferHandle();
+
+            // // color = radiance(cur_ray, 0);            
+
+            // ret.SetValue(i, color);
+            *(reinterpret_cast<Vec *>(ret.GetPhyAddr(i))) = color;
+            // auto ret_ptr = reinterpret_cast<Vec
+            // *>(ret.GetLocalBufferAddr(i)); *ret_ptr = color;
         }
 
         inQueueX.FreeTensor(ray);
@@ -326,19 +319,18 @@ class KernelRender {
     TPipe pipe;
 };
 
-extern "C" __global__ __aicore__ void render(GM_ADDR input, GM_ADDR output) {
+extern "C" __global__ __aicore__ void render(GM_ADDR rays, GM_ADDR colors) {
     KernelRender op;
 
-    op.Init(WIDTH, HEIGHT, SAMPLES, input, output);
+    op.Init(WIDTH, HEIGHT, SAMPLES, rays, colors);
     op.Process();
     op.Release();
 }
 
 #ifndef __CCE_KT_TEST__
 // call of kernel function
-void render_do(uint32_t blockDim, void *l2ctrl, void *stream, uint8_t *input,
-               uint8_t *output) {
-    add_custom<<<blockDim, l2ctrl, stream>>>(WIDTH, HEIGHT, SAMPLES, input,
-                                             output);
+void render_do(uint32_t blockDim, void *l2ctrl, void *stream, uint8_t *rays,
+               uint8_t *colors) {
+    render<<<blockDim, l2ctrl, stream>>>(rays, colors);
 }
 #endif

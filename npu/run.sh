@@ -28,7 +28,7 @@ VersionMap["ascend310p"]="Ascend310P1"
 VersionMap["ascend310B1"]="Ascend310B1"
 VersionMap["ascend910B1"]="Ascend910B1"
 
-FILE_NAME="add"
+FILE_NAME="render"
 
 SHORT=r:,v:,i:,
 LONG=run-mode:,soc-version:,install-path:,
