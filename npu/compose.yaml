@@ -9,11 +9,14 @@
 # https://github.com/docker/awesome-compose
 services:
   dev:
-    image: ascende-dev:lastest
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
-      - code-data : /root/code
-  volumes:
-    code-data:
+      - code-data:/root/code/
+    
+volumes:
+  code-data:
     # If your application exposes a port, uncomment the following lines and change
     # the port numbers as needed. The first number is the host port and the second
     # is the port inside the container.
