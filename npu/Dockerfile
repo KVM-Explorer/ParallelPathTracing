@@ -13,6 +13,10 @@ CMD ["/sbin/my_init"]
 
 # 这里可以放置你自己需要构建的命令
 
+# 换源
+RUN seq 1 8 | xargs -I{} sed -i 's/archive.ubuntu.com/mirrors.nju.edu.cn/g' /etc/apt/sources.list 
+RUN seq 1 8 | xargs -I{} sed -i 's/security.ubuntu.com/mirrors.nju.edu.cn/g' /etc/apt/sources.list
+
 RUN apt update && apt-get install -y gcc g++ make cmake zlib1g zlib1g-dev openssl libsqlite3-dev libssl-dev libffi-dev unzip pciutils net-tools libblas-dev gfortran libblas3 python3-pip
 
 RUN pip3 install attrs numpy decorator sympy cffi pyyaml pathlib2 psutil protobuf scipy requests absl-py wheel typing_extensions -i https://pypi.tuna.tsinghua.edu.cn/simple
