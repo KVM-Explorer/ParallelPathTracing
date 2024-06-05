@@ -1,5 +1,6 @@
 
 #include "data_utils.h"
+#include "common.h"
 
 #ifndef __CCE_KT_TEST__
 #include <acl/acl.h>
@@ -7,22 +8,19 @@ extern void render(uint32_t coreDim, void *l2ctrl, void *stream, uint8_t *rays,
                    uint8_t *colors);
 #else
 #include "tikicpulib.h"
-#include "types.h"
 extern "C" __global__ __aicore__ void render(GM_ADDR rays, GM_ADDR colors);
 #endif
 
 int main() {
 
     uint32_t blockDim = 8;
-
     uint32_t elementNums = WIDTH * HEIGHT * 4 * SAMPLES;
+
 
 #ifdef __CCE_KT_TEST__
 
-    size_t inputByteSize = elementNums * sizeof(Ray);
-    size_t outputByteSize = elementNums * sizeof(Vec);
-
-    std::vector<Vec> outputColor(elementNums);
+    size_t inputByteSize = elementNums * 4 * 8;
+    size_t outputByteSize = elementNums * 4 * 4;
 
     uint8_t *rays = (uint8_t *)AscendC::GmAlloc(inputByteSize);
     uint8_t *colors = (uint8_t *)AscendC::GmAlloc(outputByteSize);
@@ -41,6 +39,9 @@ int main() {
 
 #else
 
+    size_t inputByteSize = elementNums * 4 * 8 ; // 
+    size_t outputByteSize = elementNums * 4 * 4;
+
     aclrtContext context;
     int32_t deviceId = 0;
     CHECK_ACL(aclrtSetDevice(deviceId));
@@ -48,47 +49,52 @@ int main() {
     aclrtStream stream = nullptr;
     CHECK_ACL(aclrtCreateStream(&stream));
 
-    std::vector<Ray> raysData = genRays(WIDTH, HEIGHT, SAMPLES);
-    std::vector<Vec> outputColor(elementNums);
+    uint8_t *rayHost,*colorHost;
+    uint8_t *rayDevice,*colorDevice;
 
-    // uint8_t *xHost, *yHost, *zHost;
-    uint8_t *xDevice, *yDevice, *zDevice;
-
-    uint8_t *rays = (uint8_t *)AscendC::GmAlloc(inputByteSize);
-    uint8_t *colors = (uint8_t *)AscendC::GmAlloc(outputByteSize);
-    uint8_t *spheres = (uint8_t *)AscendC::GmAlloc(sphereByteSize);
+    CHECK_ACL(aclrtMallocHost((void**)(&rayHost),inputByteSize));
+    CHECK_ACL(aclrtMallocHost((void**)(&colorHost),outputByteSize));
+    
 
     // CHECK_ACL(aclrtMallocHost((void **)(&xHost), inputByteSize));
     // CHECK_ACL(aclrtMallocHost((void **)(&yHost), inputByteSize));
     // CHECK_ACL(aclrtMallocHost((void **)(&zHost), outputByteSize));
-    CHECK_ACL(aclrtMalloc((void **)&xDevice, inputByteSize,
-                          ACL_MEM_MALLOC_HUGE_FIRST));
+
     // CHECK_ACL(aclrtMalloc((void **)&yDevice, inputByteSize,
     //                       ACL_MEM_MALLOC_HUGE_FIRST));
-    CHECK_ACL(aclrtMalloc((void **)&zDevice, outputByteSize,
-                          ACL_MEM_MALLOC_HUGE_FIRST));
+
+
+    CHECK_ACL(aclrtMalloc((void**)&rayDevice,inputByteSize,ACL_MEM_MALLOC_HUGE_FIRST));
+    CHECK_ACL(aclrtMalloc((void**)&colorDevice,outputByteSize,ACL_MEM_MALLOC_HUGE_FIRST));
 
     // ReadFile("./input/input_x.bin", inputByteSize, xHost, inputByteSize);
     // ReadFile("./input/input_y.bin", inputByteSize, yHost, inputByteSize);
 
-    CHECK_ACL(aclrtMemcpy(xDevice, inputByteSize, raysData.data(),
-                          inputByteSize, ACL_MEMCPY_HOST_TO_DEVICE));
+
+
+    CHECK_ACL(aclrtMemcpy(rayDevice,inputByteSize,rayHost,inputByteSize,ACL_MEMCPY_HOST_TO_DEVICE));
+
     // CHECK_ACL(aclrtMemcpy(yDevice, inputByteSize, yHost, inputByteSize,
     //                       ACL_MEMCPY_HOST_TO_DEVICE));
 
-    render(blockDim, nullptr, stream, xDevice, zDevice);
+    render(blockDim, nullptr, stream, rayDevice, colorDevice);
     CHECK_ACL(aclrtSynchronizeStream(stream));
 
-    CHECK_ACL(aclrtMemcpy(outputColor.data(), outputByteSize, zDevice,
-                          outputByteSize, ACL_MEMCPY_DEVICE_TO_HOST));
-    // WriteFile("./output/output_z.bin", zHost, outputByteSize);
+    // CHECK_ACL(aclrtMemcpy(outputColor.data(), outputByteSize, zDevice,
+    //                       outputByteSize, ACL_MEMCPY_DEVICE_TO_HOST));
+    CHECK_ACL(aclrtMemcpy(colorHost,outputByteSize,colorDevice,outputByteSize,ACL_MEMCPY_DEVICE_TO_HOST));
 
-    CHECK_ACL(aclrtFree(xDevice));
+    WriteFile("./output/color.bin", colorHost, outputByteSize);
+
+    CHECK_ACL(aclrtFree(rayDevice));
     // CHECK_ACL(aclrtFree(yDevice));
-    CHECK_ACL(aclrtFree(zDevice));
+    CHECK_ACL(aclrtFree(colorDevice));
     // CHECK_ACL(aclrtFreeHost(xHost));
     // CHECK_ACL(aclrtFreeHost(yHost));
     // CHECK_ACL(aclrtFreeHost(zHost));
+
+    CHECK_ACL(aclrtFreeHost(rayHost));
+    CHECK_ACL(aclrtFreeHost(colorHost));
 
     CHECK_ACL(aclrtDestroyStream(stream));
     CHECK_ACL(aclrtDestroyContext(context));

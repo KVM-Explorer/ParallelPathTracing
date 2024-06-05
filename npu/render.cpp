@@ -1,5 +1,215 @@
-#include "rt_helper.h"
+#include "common.h"
+#include "kernel_operator.h"
+// #include <cmath>
+#include <cstdint>
 using namespace AscendC;
+#ifdef __CCE_KT_TEST__
+#include <random>
+#include <stub_def.h>
+#else
+#include <cstdlib>
+#endif
+#include <vector>
+using namespace std;
+
+__aicore__ static FF randomFF() {
+#ifdef __CCE_KT_TEST__
+    static std::uniform_real_distribution<FF> dist(0, 1);
+    static std::mt19937_64 gen;
+    return dist(gen);
+#else
+
+    return static_cast<FF>(drand48());
+#endif
+}
+
+__aicore__ static FF FFabs(FF x) {
+    if (x > 0)
+        return x;
+    return -x;
+}
+
+__aicore__ float InvSqrt(float x) {
+    float xhalf = 0.5f * x;
+    int i = *(int *)&x;             // 将浮点数转换为整数
+    i = 0x5f3759df - (i >> 1);      // 初始猜测的位运算
+    x = *(float *)&i;               // 将整数转换回浮点数
+    x = x * (1.5f - xhalf * x * x); // Newton's method
+    return x;
+}
+
+__aicore__ float sqrt32_approx(float value) { return 1.0f / InvSqrt(value); }
+__aicore__ inline FF FFsqrt(FF x) { return sqrt32_approx(x); }
+
+inline FF clamp(FF x) { return x < FF(0) ? FF(0) : x > FF(1) ? FF(1) : x; }
+inline int toInt(FF x) { return int(pow(clamp(x), FF(1 / 2.2)) * 255 + .5); }
+
+struct Vec {
+    FF x, y, z, w;
+    bool operator<(const Vec &other) const {
+        // Implement the comparison logic for your Vec class
+        // For example, you could compare the individual elements of the vectors
+
+        return false; // Vectors are equal
+    }
+
+    __aicore__ Vec(FF x_ = 0, FF y_ = 0, FF z_ = 0) : x(x_), y(y_), z(z_) {}
+
+    __aicore__ Vec(__ubuf__ const Vec &data)
+        : x(data.x), y(data.y), z(data.z), w(0) {}
+    __aicore__ Vec operator+(const Vec &v) const {
+        return Vec(x + v.x, y + v.y, z + v.z);
+    };
+    __aicore__ Vec operator-(const Vec &v) const {
+        return Vec(x - v.x, y - v.y, z - v.z);
+    };
+    __aicore__ Vec operator*(FF b) const { return Vec(x * b, y * b, z * b); };
+    __aicore__ Vec mult(const Vec &v) const {
+        return Vec(x * v.x, y * v.y, z * v.z);
+    }
+    __aicore__ Vec &norm() {
+        return *this = *this * (1 / sqrt(x * x + y * y + z * z));
+    }
+    __aicore__ FF dot(const Vec &v) const {
+        return x * v.x + y * v.y + z * v.z;
+    }
+
+    __aicore__ Vec cross(const Vec &v) const {
+        return Vec(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
+    }
+};
+
+__aicore__ static Vec randomVec() {
+    return Vec(randomFF(), randomFF(), randomFF());
+}
+
+struct Ray {
+    Vec o, d;
+    __aicore__ Ray(Vec o_, Vec d_) : o(o_), d(d_) {}
+    __aicore__ Ray(__ubuf__ Ray const &data) : o(data.o), d(data.d) {}
+};
+
+struct Sphere {
+    FF rad;
+    Vec p, e, c;
+    MaterialType m;
+    __aicore__ Sphere(FF rad_, Vec p_, Vec e_, Vec c_, MaterialType m_)
+        : rad(rad_), p(p_), e(e_), c(c_), m(m_) {}
+    __aicore__ FF intersect(const Ray &r) const {
+        Vec op = p - r.o;
+        FF t, epsilon = 1e-4, b = op.dot(r.d),
+              det = b * b - op.dot(op) + rad * rad;
+        if (det < FF(0))
+            return 0;
+        else
+            det = FFsqrt(det);
+        return (t = b - det) > epsilon ? t
+                                       : ((t = b + det) > epsilon ? t : FF(0));
+    }
+};
+
+int32_t num_spheres = 9;
+static Sphere spheres[] = {
+    Sphere(1e5, Vec(1e5 + 1, 40.8, 81.6), Vec(), Vec(.75, .25, .25),
+           DIFF), // Left
+    Sphere(1e5, Vec(-1e5 + 99, 40.8, 81.6), Vec(), Vec(.25, .25, .75),
+           DIFF), // Right
+    Sphere(1e5, Vec(50, 40.8, 1e5), Vec(), Vec(.75, .75, .75), DIFF),
+    Sphere(1e5, Vec(50, 40.8, -1e5 + 170), Vec(), Vec(), DIFF),
+    Sphere(1e5, Vec(50, 1e5, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
+    Sphere(1e5, Vec(50, -1e5 + 81.6, 81.6), Vec(), Vec(.75, .75, .75), DIFF),
+    Sphere(16.5, Vec(27, 16.5, 47), Vec(), Vec(1, 1, 1) * .999,
+           SPEC), // Mirror
+    Sphere(16.5, Vec(73, 16.5, 78), Vec(), Vec(1, 1, 1) * .999,
+           REFR), // Glass
+    Sphere(600, Vec(50, 681.6 - .27, 81.6), Vec(12, 12, 12), Vec(),
+           DIFF)}; // Light
+
+__aicore__ inline bool intersect(const Ray &r, float &t, int &id) {
+    float n = num_spheres, d, inf = t = 1e20;
+    for (int i = int(n); i--;)
+        if ((d = spheres[i].intersect(r)) && d < t) {
+            t = d;
+            id = i;
+        }
+    return t < inf;
+}
+
+__aicore__ inline Vec radiance(const Ray &input_r, int input_depth) {
+
+    float t;
+    int id = 0;
+    Ray r = input_r;
+    int depth = input_depth;
+    Vec cl(0, 0, 0); // accumulated color
+    Vec cf(1, 1, 1); // accumulated reflectance
+
+    while (1) {
+        if (!intersect(r, t, id))
+            return cl;                   // if miss, return black
+        const Sphere &obj = spheres[id]; // the hit object
+        Vec x = r.o + r.d * t, n = (x - obj.p).norm(),
+            nl = n.dot(r.d) < FF(0) ? n : n * -1, f = obj.c;
+        float p = f.x > f.y && f.x > f.z ? f.x
+                  : f.y > f.z            ? f.y
+                                         : f.z; // max refl
+        cl = cl + cf.mult(obj.e);
+        if (++depth > 5)
+
+            if (randomFF() < p) {
+                f = f * (1 / p);
+            } else {
+                return cl; // R.R.
+            }
+        cf = cf.mult(f);
+        if (obj.m == DIFF) { // Ideal DIFFUSE reflection
+            float r1 = 2 * PI * randomFF(), r2 = randomFF(), r2s = FFsqrt(r2);
+            Vec w = nl,
+                u = ((FFabs(w.x) > .1F ? Vec(0, 1) : Vec(1)).cross(w)).norm(),
+                v = w.cross(u);
+            Vec d =
+                (u * cos(r1) * r2s + v * sin(r1) * r2s + w * FFsqrt(1.0F - r2))
+                    .norm();
+            // return obj.e + f.mult(radiance(Ray(x,d),depth,Xi));
+            r = Ray(x, d);
+            continue;
+        } else if (obj.m == SPEC) { // Ideal SPECULAR reflection
+            // return obj.e +
+            // f.mult(radiance(Ray(x,r.d-n*2*n.dot(r.d)),depth,Xi));
+            r = Ray(x, r.d - n * 2 * n.dot(r.d));
+            continue;
+        }
+        Ray reflRay(x, r.d - n * 2 * n.dot(r.d)); // Ideal dielectric REFRACTION
+        bool into = n.dot(nl) > FF(0);            // Ray fromoutside going in?
+        int nc = 1;
+        float nt = 1.5, nnt = into ? nc / nt : nt / nc, ddn = r.d.dot(nl),
+              cos2t;
+        if ((cos2t = 1 - nnt * nnt * (1 - ddn * ddn)) <
+            0) { // Total internal reflection
+            // return obj.e + f.mult(radiance(reflRay,depth,Xi));
+            r = reflRay;
+            continue;
+        }
+        Vec tdir =
+            (r.d * nnt - n * ((into ? 1 : -1) * (ddn * nnt + FFsqrt(cos2t))))
+                .norm();
+        float a = nt - nc, b = nt + nc, R0 = a * a / (b * b),
+              c = 1 - (into ? -ddn : tdir.dot(n));
+        float Re = R0 + (1 - R0) * c * c * c * c * c, Tr = 1 - Re,
+              P = .25f + .5f * Re, RP = Re / P, TP = Tr / (1 - P);
+        // return obj.e + f.mult(erand48(Xi)<P ?
+        //                       radiance(reflRay,    depth,Xi)*RP:
+        //                       radiance(Ray(x,tdir),depth,Xi)*TP);
+        if (randomFF() < P) {
+            cf = cf * RP;
+            r = reflRay;
+        } else {
+            cf = cf * TP;
+            r = Ray(x, tdir);
+        }
+        continue;
+    }
+}
 
 constexpr int32_t TOTAL_NUM = WIDTH * HEIGHT * SAMPLES * 4;
 constexpr int32_t USE_CORE_NUM = 8;
@@ -11,7 +221,7 @@ class KernelRender {
   public:
     __aicore__ inline KernelRender() {}
     __aicore__ inline void Init(int w, int h, int s, GM_ADDR input,
-                                 GM_ADDR output) {
+                                GM_ADDR output) {
 
         width = w;
         height = h;
@@ -108,8 +318,6 @@ class KernelRender {
     // LocalTensor<Sphere> localSpheres;
     GlobalTensor<Vec> resultColor;
     GlobalTensor<Ray> inputRays;
-
-    Vec cx, cy;
     // 输入队列
     TQue<QuePosition::VECIN, BUFFER_NUM> inQueueX;
     // 输出队列
