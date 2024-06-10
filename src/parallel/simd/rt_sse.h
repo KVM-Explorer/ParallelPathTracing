@@ -59,7 +59,7 @@ class RtOptimzationSSE : public RayTracer {
                             SIMD::VecSSE d = camera->cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                                              camera->cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera->direction;
 
-                            ret = ret + tracing(Ray(camera->position + d * 140, d.normSSE()), 0, scene) * (1. / samples);
+                            ret = ret + tracing(SIMD::RaySSE(camera->position + d * 140, d.normSSE()), 0, scene) * (1. / samples);
                             ;
                         }
                     }

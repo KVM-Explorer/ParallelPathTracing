@@ -119,21 +119,23 @@ struct SpherePack4 {
         Float4 b4X = positionX - ray.originX;
         Float4 b4Y = positionY - ray.originY;
         Float4 b4Z = positionZ - ray.originZ;
-        Float4 b4 = b4X.mult(ray.dirX) + b4Y.mult(ray.dirY) + b4Z.mult(ray.dirZ); // 
+        Float4 b4 = b4X.mult(ray.dirX) + b4Y.mult(ray.dirY) + b4Z.mult(ray.dirZ); //
 
-        return t;
-    };
+        // TODO: 待实现
+        return zero4;
+    }
+};
 
-    struct Camera {
-        using Vec = SIMD::VecSSE;
-        Vec position;
-        Vec direction;
-        Vec cx, cy;
+struct Camera {
+    using Vec = SIMD::VecSSE;
+    Vec position;
+    Vec direction;
+    Vec cx, cy;
 
-        Camera(Vec position, Vec direction, int w, int h) : position(position), direction(direction) {
-            cx = Vec(w * .5135 / h);
-            cy = (cx % direction).norm() * .5135;
-        }
-    };
+    Camera(Vec position, Vec direction, int w, int h) : position(position), direction(direction) {
+        cx = Vec(w * .5135 / h);
+        cy = (cx % direction).norm() * .5135;
+    }
+};
 
 } // namespace SIMD
