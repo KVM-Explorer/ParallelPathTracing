@@ -1,6 +1,7 @@
 
 
-add_requires("openmp")
+
+-- 在目标配置中加入对 "openmp" 选项的判断
 target("PathTracing")
     add_files("main.cpp")
     set_kind("binary")

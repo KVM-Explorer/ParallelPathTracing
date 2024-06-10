@@ -6,3 +6,5 @@ set_languages("c++20")
 includes("lib")
 includes("src")
 includes("tests")
+-- includes("gpu")
+

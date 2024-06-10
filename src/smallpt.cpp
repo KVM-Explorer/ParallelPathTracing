@@ -124,7 +124,7 @@ Vec radiance(const Ray &r, int depth, unsigned short *Xi) {
                                     : radiance(reflRay, depth, Xi) * Re + radiance(Ray(x, tdir), depth, Xi) * Tr);
 }
 int main(int argc, char *argv[]) {
-    int w = 512, h = 512, samps = argc == 2 ? atoi(argv[1]) / 4 : 1; // # samples
+    int w = 1024, h = 768, samps = argc == 2 ? atoi(argv[1]) / 4 : 1; // # samples
     Ray cam(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm());        // cam pos, dir
     Vec cx = Vec(w * .5135 / h), cy = (cx % cam.d).norm() * .5135, r, *c = new Vec[w * h];
 
@@ -133,7 +133,7 @@ int main(int argc, char *argv[]) {
         for (int y = 0; y < h; y++) {                        // Loop over image rows
             fprintf(stderr, "\rRendering (%d spp) %5.2f%%", samps * 4, 100. * y / (h - 1));
             for (unsigned short x = 0,
-                                Xi[3] = {0, 0, y * y * y}; x < w; x++) // Loop cols
+                                Xi[3] = {0, 0, static_cast<unsigned short>(y * y * y)}; x < w; x++) // Loop cols
                 for (int sy = 0,
                          i = (h - y - 1) * w + x; sy < 2; sy++)       // 2x2 subpixel rows
                     for (int sx = 0; sx < 2; sx++,
@@ -156,27 +156,6 @@ int main(int argc, char *argv[]) {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     printf("\nrendering time %.2lf s\n",duration / 1e3);
-
-    // test pixel
-    // x: 809, y: 0, subx: 1, suby: 1, s: 0 d:(0.189355,-0.283993,-0.939943) tracing:(0.000000,0.000000,0.000000)
-    // int x = 809;
-    // int y = 0;
-    // int subx = 1;
-    // int suby = 1;
-    // int s = 0;
-    // Vec d = Vec(0.189355, -0.283993, -0.939943);
-    // unsigned short Xi[3] = {0, 0, y * y * y};
-
-    // int x = 5;
-    // int y = 0;
-    // int subx = 0;
-    // int suby = 1;
-    // int s = 0;
-    // Vec d = Vec(-0.311788, -0.274857, -0.909529);
-    // unsigned short Xi[3] = {0, 0, y * y * y};
-
-
-    // Vec tmp = radiance(Ray(Vec(50, 52, 295.6) + d * 140, d.norm()), 0, Xi);
 
     FILE *f = fopen("image.ppm", "w"); // Write image to PPM file.
     fprintf(f, "P3\n%d %d\n%d\n", w, h, 255);
