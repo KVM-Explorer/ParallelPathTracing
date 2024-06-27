@@ -1,0 +1,8 @@
+version: '3.8'
+services:
+  dev:
+    image: ascende-dev:0.3
+    volumes:
+      - code-data:/root/workspace
+volumes:
+  code-data:

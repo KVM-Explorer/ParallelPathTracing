@@ -1,0 +1,60 @@
+
+cmake_minimum_required(VERSION 3.20)
+
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+set(target_name "parallel_rendering")
+set(ASCEND_PRODUCT_TYPE "Ascend310P1")
+# set(ASCEND_PRODUCT_TYPE "Ascend310B1")
+set(ASCEND_CORE_TYPE "AiCore")
+set(ASCEND_RUN_MODE "cpu")
+set(ASCEND_INSTALL_PATH "/usr/local/Ascend/ascend-toolkit/latest")
+set(CMAKE_CXX_STANDARD 17)
+
+
+if (NOT DEFINED ENV{CMAKE_PREFIX_PATH})
+    set(CMAKE_PREFIX_PATH ${ASCEND_INSTALL_PATH}/tools/tikicpulib/lib/cmake)
+endif()
+
+set(CCE_CMAKE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
+list(APPEND CMAKE_MODULE_PATH ${CCE_CMAKE_PATH})
+
+# message(INFO "CCE_CMAKE_PATH: ${CCE_CMAKE_PATH}")
+
+project(${target_name}_cpu CXX CCE) # CCE is a custom language
+
+
+
+find_package(tikicpulib REQUIRED)
+
+file(GLOB SRC_FILES
+    ${CMAKE_SOURCE_DIR}/main.cpp
+)
+
+add_executable(${target_name}_cpu
+    ${SRC_FILES}
+)
+
+target_include_directories(${target_name}_cpu PRIVATE
+    ${ASCEND_INSTALL_PATH}/acllib/include
+    ${CMAKE_SOURCE_DIR}
+)
+
+target_link_libraries(${target_name}_cpu PRIVATE
+    tikicpulib::${ASCEND_PRODUCT_TYPE}
+    ascendcl
+)
+
+target_compile_options(${target_name}_cpu PRIVATE
+    -g
+)
+
+target_compile_definitions(${target_name}_cpu PRIVATE
+    _GLIBCXX_USE_CXX11_ABI=0
+)
+
+set_target_properties(${target_name}_cpu PROPERTIES
+    OUTPUT_NAME ${target_name}_${ASCEND_RUN_MODE}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}
+)

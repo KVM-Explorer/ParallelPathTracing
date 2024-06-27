@@ -22,14 +22,14 @@ class RtOptimzationSSE : public RayTracer {
         : image(image), samples(samples) {
         using TypeConverter::convert;
         this->camera = std ::unique_ptr<SIMD::Camera>(new SIMD::Camera(convert(camera.position),
-                                                                        convert(camera.direction),
-                                                                        image.width, image.height));
+                                                                       convert(camera.direction),
+                                                                       image.width, image.height));
         for (auto &s : scene) {
             this->scene.push_back(SIMD::Sphere(s.radius,
-                                             convert(s.position),
-                                             convert(s.emission),
-                                             convert(s.color),
-                                             s.material));
+                                               convert(s.position),
+                                               convert(s.emission),
+                                               convert(s.color),
+                                               s.material));
         }
     }
 
@@ -38,9 +38,9 @@ class RtOptimzationSSE : public RayTracer {
     }
 
     void render() override {
-        using SIMD::Ray;
+        using SIMD::RaySSE;
         int count = 0;
-        for (int y = 0; y < image.height; y++) {                                  // Loop over image rows
+        for (int y = 0; y < image.height; y++) {                                       // Loop over image rows
             OutputStatus("RayTracer SIMD SSE", y, image.height, samples, image.width); // Output status
 
             for (int x = 0; x < image.width; x++) // Loop cols
@@ -50,7 +50,7 @@ class RtOptimzationSSE : public RayTracer {
 
                     for (int subx = 0; subx < 2; subx++) {
                         for (int s = 0; s < samples; s++) {
-                            count ++;
+                            count++;
                             Float r1 = 2 * random();
                             Float r2 = 2 * random();
 
@@ -59,7 +59,8 @@ class RtOptimzationSSE : public RayTracer {
                             SIMD::VecSSE d = camera->cx * (((subx + .5 + dx) / 2 + x) / image.width - .5) +
                                              camera->cy * (((suby + .5 + dy) / 2 + y) / image.height - .5) + camera->direction;
 
-                            ret = ret + tracing(Ray(camera->position + d * 140, d.normSSE()), 0, scene) * (1./samples);;
+                            ret = ret + tracing(Ray(camera->position + d * 140, d.normSSE()), 0, scene) * (1. / samples);
+                            ;
                         }
                     }
                     auto vec = ret.get();
@@ -76,8 +77,8 @@ class RtOptimzationSSE : public RayTracer {
     }
 
   private:
-    SIMD::VecSSE tracing(const SIMD::Ray &r, int depth, SIMD::Scene &scene) {
-        using Ray = SIMD::Ray;
+    SIMD::VecSSE tracing(const SIMD::RaySSE &r, int depth, SIMD::Scene &scene) {
+        using Ray = SIMD::RaySSE;
 
         Float min_dis;
         int hit_object = 0;

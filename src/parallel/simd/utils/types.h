@@ -16,6 +16,12 @@ struct VecSSE {
     VecSSE operator+(const VecSSE &b) const { return _mm_add_ps(m_data, b.m_data); }
     VecSSE operator-(const VecSSE &b) const { return _mm_sub_ps(m_data, b.m_data); }
     VecSSE operator*(Float b) const { return _mm_mul_ps(m_data, _mm_set1_ps(b)); }
+    float operator[](int i) const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[i];
+    }
+
     VecSSE mult(const VecSSE &b) const { return _mm_mul_ps(m_data, b.m_data); }
 
     // 基于SIMD计算，快但是存在一定精度损失
@@ -80,6 +86,64 @@ struct VecSSE {
         Float values[4];
         _mm_storeu_ps(values, m_data);
         return values[2];
+    }
+};
+
+struct Float4 {
+    __m128 m_data;
+
+    Float4(Float x = 0, Float y = 0, Float z = 0, Float w = 0) : m_data(_mm_set_ps(w, z, y, x)) {}
+    Float4(__m128 data) : m_data(data) {}
+
+    Float4 operator+(const Float4 &b) const { return _mm_add_ps(m_data, b.m_data); }
+    Float4 operator-(const Float4 &b) const { return _mm_sub_ps(m_data, b.m_data); }
+    Float4 operator*(Float b) const { return _mm_mul_ps(m_data, _mm_set1_ps(b)); }
+    Float operator[](int i) const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[i];
+    }
+    Float4 mult(const Float4 &b) const { return _mm_mul_ps(m_data, b.m_data); }
+
+    Float4 &norm() {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        Float length = std::sqrt(values[0] * values[0] + values[1] * values[1] + values[2] * values[2]);
+        m_data = _mm_mul_ps(m_data, _mm_set1_ps(1 / length));
+        return *this;
+    }
+
+    Float dot(const Float4 &b) const {
+        __m128 temp = _mm_mul_ps(m_data, b.m_data);
+        temp = _mm_hadd_ps(temp, temp);
+        temp = _mm_hadd_ps(temp, temp);
+        Float result[4];
+        _mm_storeu_ps(result, temp);
+        return result[0];
+    }
+
+    Float x() const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[0];
+    }
+
+    Float y() const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[1];
+    }
+
+    Float z() const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[2];
+    }
+
+    Float w() const {
+        Float values[4];
+        _mm_storeu_ps(values, m_data);
+        return values[3];
     }
 };
 
