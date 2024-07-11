@@ -12,13 +12,8 @@ inline Float clamp(Float value) {
 
 }
 
-inline Float random() {
-    #if RANDOM_FROZEN
-        static Float random = 0.8;
-        return random;
-    #endif
-    
+inline Float random(Float seed = 0) {
+    static std::mt19937_64 generator(seed);
     static std::uniform_real_distribution<Float> distribution(0.0, 1.0);
-    static std::mt19937_64 generator;
     return distribution(generator);
 }

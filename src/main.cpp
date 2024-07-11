@@ -1,6 +1,8 @@
 #include "camera.h"
+#include "debug_helper.h"
 #include "image.h"
-#include "parallel/simd/rt_sse.h"
+#include "parallel/simd/simd_helper.h"
+#include "parallel/soa/rt_soa.h"
 #include "parallel/thread/rt_openmp.h"
 #include "parallel/thread/rt_thead.h"
 #include "profile.h"
@@ -9,62 +11,58 @@
 #include "scene.h"
 #include <iostream>
 
-enum class Mode {
-    CPU,
-    SIMD_SSE,
-    SIMD_AVX,
-    SIMD_AVX_512,
-    RawThread,
-    OpenMP,
-    Async,
-};
-
 int main(int argc, char *argv[]) {
 
     // configuration
+    Application app;
+    app.run(argc, argv);
 
-    Image image("image.ppm", 512, 512);
-    Mode mode = Mode::RawThread;
+    DebugHelper::init(app.name(),app.getLogLevel());
+
+    Image image(app.output, app.width, app.height);
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
     Scene scene = CornellBox();
-    int samples = 1; // 2 * 2 * samples per pixel
-    bool profile = true;
-    int threadNum = 8;
-    ThreadLoadType splitThreadLoadType = ThreadLoadType::Row;
-    OpenMPMode openmpMode = OpenMPMode::ParallelTask;
-    int taskSize = 1 * 1;
+    int samples = app.samples; // 2 * 2 * samples per pixel
+    bool profile = app.profile;
+    int threadNum = app.threads;
+    ThreadLoadType splitThreadLoadType = app.getThreadLoadType();
+    OpenMPMode openmpMode = app.getOpenMPMode();
+    int taskSize = app.taskSize;
 
-    if (argc > 1) {
-        // Parse the taskSize argument
-        taskSize = std::atoi(argv[1]);
-        std::cout << std::format("Input taskSize: {}\n", taskSize);
-
-        // samples = std::atoi(argv[1]);
-        // std::cout << std::format("Input samples: {} sample rays: {}\n", samples, samples * 4);
-    }
+    // print configuration
+    app.print();
 
     // render
     std::unique_ptr<RayTracer> raytracer;
-    switch (mode) {
-    case Mode::CPU: {
+    switch (app.getExecuteMode()) {
+    case ExecuteMode::CPU: {
+        std::cout << "Mode: CPU" << std::endl;
         raytracer = std::make_unique<RtCpu>(image, cam, scene, samples);
         break;
     }
-    case Mode::SIMD_SSE: {
-        raytracer = std::make_unique<RtOptimzationSSE>(image, cam, scene, samples);
+    case ExecuteMode::SoA: {
+        std::cout << "Mode: SoA" << std::endl;
+        raytracer = std::make_unique<RayTracingSoA>(image, cam, scene, samples);
         break;
     }
-    case Mode::RawThread: {
+    // case Mode::SIMD_SSE: {
+    //     raytracer = std::make_unique<RtOptimzationSSE>(image, cam, scene, samples);
+    //     break;
+    // }
+    case ExecuteMode::RawThread: {
+        std::cout << "Mode: RawThread" << std::endl;
         raytracer = std::make_unique<RtThread>(image, cam, scene, samples, threadNum, taskSize, splitThreadLoadType);
         break;
     }
 
-    case Mode::OpenMP: {
-        raytracer = std::make_unique<RtOpenMP>(image, cam, scene, samples,openmpMode,taskSize);
+    case ExecuteMode::OpenMP: {
+        std::cout << "Mode: OpenMP" << std::endl;
+        raytracer = std::make_unique<RtOpenMP>(image, cam, scene, samples, openmpMode, taskSize);
         break;
     }
 
     default:
+        std::cout << "Unknown Mode, Select Default Mode CPU" << std::endl;
         raytracer = std::make_unique<RtCpu>(image, cam, scene, samples);
     }
 
@@ -81,4 +79,5 @@ int main(int argc, char *argv[]) {
     std::cout << "Image saved to image.ppm" << std::endl;
     // output
     image.save();
+    spdlog::shutdown();
 }

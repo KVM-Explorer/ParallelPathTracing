@@ -9,6 +9,7 @@ struct Ray {
 
     Ray(Vec origin, Vec direction) : origin(origin), dir(direction) {}
     Ray() {}
+    Vec at(Float t) const { return origin + dir * t; }
 };
 
 struct Sphere {

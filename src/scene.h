@@ -2,8 +2,16 @@
 #include "rt_math.h"
 #include "utils/rt_helper.h"
 #include <vector>
+#include "debug_helper.h"
 
 using Scene = std::vector<Sphere>;
+
+struct HitRecord {
+    Vec pos;
+    Vec normal;
+    Float t;
+    int id;
+};
 
 // 判断是否命中物体
 inline bool intersect(const Ray &r, Float &t, int &hit_object, Scene &scene) {
@@ -18,6 +26,9 @@ inline bool intersect(const Ray &r, Float &t, int &hit_object, Scene &scene) {
             hit_object = i;
         }
     }
+
+    spdlog::debug("min_dis: {}, t: {}, hit_object: {}", min_dis, t, hit_object);
+
     return t < INF;
 }
 
