@@ -1,14 +1,17 @@
 
 
 add_requires("openmp")
+add_requires("cli11","spdlog")
+
 target("PathTracing")
-    add_files("main.cpp")
+    add_files("main.cpp","config.cpp")
     set_kind("binary")
     add_includedirs("./",{public=true})
     add_tests("cpu")
-    add_packages("openmp")
-    add_cxxflags("-openmp:llvm")
+    -- add_packages("openmp")
+    -- add_cxxflags("-openmp:llvm")
     add_vectorexts("all")
+    add_packages("cli11","spdlog")
 
     
 
