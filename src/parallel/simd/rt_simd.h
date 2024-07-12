@@ -80,7 +80,7 @@ class RayTracingSIMD : public RayTracer {
                             ret = ret + tracing(Ray(camera.position + d * 140, d.norm()), 0) * (1. / samples);
                         }
                     }
-                    image.write(x, image.height - y - 1, ret * .25);
+                    image.write(x, image.height - y - 1, Vec(clamp(ret.x), clamp(ret.y), clamp(ret.z)) * .25);
                 }
             }
         }

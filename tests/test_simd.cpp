@@ -1,6 +1,6 @@
 #include "catch2/catch_amalgamated.hpp"
 
-#include "../src/parallel/simd/math_simd.h"
+#include "parallel/simd/math_simd.h"
 
 // ==================== Unit Tests ====================
 

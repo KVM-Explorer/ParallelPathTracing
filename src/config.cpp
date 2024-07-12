@@ -12,6 +12,7 @@ Application::Application() {
     app.add_option("-p,--profile", profile, "Profile mode");
     app.add_option("-l,--load", loadType, "Thread load type: Row, Column, Task");
     app.add_option("--task", taskSize, "Task size");
+    app.add_option("--scene", scene, "Scene name");
     app.allow_extras();
 }
 

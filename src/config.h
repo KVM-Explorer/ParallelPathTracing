@@ -38,7 +38,6 @@ class Application {
     std::string name() const { return executeMode; }
     std::string getLogLevel() const { return logLevel; }
 
-
   public:
     CLI::App app;
     std::string output = "image.ppm";
@@ -48,6 +47,7 @@ class Application {
     int threads = 8;
     bool profile = true;
     int taskSize = 1 * 1;
+    std::string scene = "basic";
 
   private:
     std::string loadType = "Row";
