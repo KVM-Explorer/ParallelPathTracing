@@ -1,6 +1,7 @@
 #include "camera.h"
 #include "debug_helper.h"
 #include "image.h"
+#include "parallel/simd/rt_simd.h"
 #include "parallel/simd/simd_helper.h"
 #include "parallel/soa/rt_soa.h"
 #include "parallel/thread/rt_openmp.h"
@@ -17,7 +18,7 @@ int main(int argc, char *argv[]) {
     Application app;
     app.run(argc, argv);
 
-    DebugHelper::init(app.name(),app.getLogLevel());
+    DebugHelper::init(app.name(), app.getLogLevel());
 
     Image image(app.output, app.width, app.height);
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
@@ -45,10 +46,11 @@ int main(int argc, char *argv[]) {
         raytracer = std::make_unique<RayTracingSoA>(image, cam, scene, samples);
         break;
     }
-    // case Mode::SIMD_SSE: {
-    //     raytracer = std::make_unique<RtOptimzationSSE>(image, cam, scene, samples);
-    //     break;
-    // }
+    case ExecuteMode::SIMD_SSE: {
+        std::cout << "Mode: SIMD_SSE" << std::endl;
+        raytracer = std::make_unique<RayTracingSIMD>(image, cam, scene, samples);
+        break;
+    }
     case ExecuteMode::RawThread: {
         std::cout << "Mode: RawThread" << std::endl;
         raytracer = std::make_unique<RtThread>(image, cam, scene, samples, threadNum, taskSize, splitThreadLoadType);

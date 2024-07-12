@@ -1,8 +1,8 @@
 #pragma once
+#include "debug_helper.h"
 #include "rt_math.h"
 #include "utils/rt_helper.h"
 #include <vector>
-#include "debug_helper.h"
 
 using Scene = std::vector<Sphere>;
 
@@ -18,7 +18,7 @@ inline bool intersect(const Ray &r, Float &t, int &hit_object, Scene &scene) {
 
     Float min_dis = t = INF;
 
-    for (int i = scene.size(); i--;) {
+    for (int i = 0; i < scene.size(); i++) {
 
         min_dis = scene[i].intersect(r);
         if (min_dis && min_dis < t) {

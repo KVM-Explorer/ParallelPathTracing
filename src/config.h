@@ -52,6 +52,6 @@ class Application {
   private:
     std::string loadType = "Row";
     std::string openMPMode = "ParallelFor";
-    std::string executeMode = "SoA";
+    std::string executeMode = "CPU";
     std::string logLevel = "debug";
 };
