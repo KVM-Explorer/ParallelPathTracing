@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     Image image(app.output, app.width, app.height);
     Camera cam = Camera(Vec(50, 52, 295.6), Vec(0, -0.042612, -1).norm(), image);
-    Scene scene = CornellBox();
+    Scene scene = CornelBoxWithPlantySphere(64);
     int samples = app.samples; // 2 * 2 * samples per pixel
     bool profile = app.profile;
     int threadNum = app.threads;

@@ -53,5 +53,5 @@ class Application {
     std::string loadType = "Row";
     std::string openMPMode = "ParallelFor";
     std::string executeMode = "CPU";
-    std::string logLevel = "debug";
+    std::string logLevel = "off";
 };
