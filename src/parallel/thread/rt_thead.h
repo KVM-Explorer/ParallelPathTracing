@@ -1,3 +1,4 @@
+#pragma once
 #include "image.h"
 #include "raytracer.h"
 #include "task_queue.h"
@@ -6,11 +7,7 @@
 #include <stack>
 #include <tuple>
 
-enum class ThreadLoadType {
-    Row,
-    Column,
-    Block,
-};
+#include "config.h"
 
 class RtThread : public RayTracer {
   private:

@@ -9,6 +9,6 @@ const int MaxDepth = 50;
 class RayTracer {
   public:
     virtual void render() = 0;
-    virtual Vec testPixel(const Ray &r, Scene &Scene) = 0;
+    virtual Vec testPixel(const Ray &r, Scene &Scene) { return {}; };
     virtual std::string name() = 0;
 };

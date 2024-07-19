@@ -26,6 +26,7 @@ for _, file in ipairs(files) do
         set_kind("binary")
         add_deps("catch2")
         add_vectorexts("all")
+        add_includedirs("../src")
 
 end
 

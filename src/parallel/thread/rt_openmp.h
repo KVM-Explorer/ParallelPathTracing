@@ -1,13 +1,10 @@
+#pragma once
 #include "image.h"
 #include "raytracer.h"
 #include "viz_helper.h"
 #include <omp.h>
+#include "config.h"
 
-enum class OpenMPMode {
-    ParallelFor,
-    ParallelTask,
-    ParallelWorkStealing,
-};
 
 class RtOpenMP : public RayTracer {
   private:
